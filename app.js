@@ -2,6 +2,18 @@ import { tableCatalog } from './catalog.js';
 import { arrange } from './lib/solver.js';
 import { renderDiagram, computeScale } from './lib/render.js';
 import { roomAreaSqFt, effectiveFootprintForBuffer } from './lib/geometry.js';
+import { themes } from './themes.js';
+
+function applyThemeFromQuery() {
+  const themeId = new URLSearchParams(window.location.search).get('theme');
+  const theme = themes[themeId];
+  if (!theme) return;
+  for (const [name, value] of Object.entries(theme.vars)) {
+    document.documentElement.style.setProperty(name, value);
+  }
+}
+
+applyThemeFromQuery();
 
 const tableSelect = document.getElementById('table-type');
 const bufferInput = document.getElementById('buffer-override');

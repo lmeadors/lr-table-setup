@@ -14,4 +14,8 @@ python3 -m http.server 8080
 
 Then open `http://localhost:8080/index.html`.
 
+## Embedding and styling
+
+To fit it into another site, see [STYLING.md](STYLING.md) — CSS custom properties for theming, plus iframe and inline embed recipes. Preview built-in themes and copy their CSS at [theme-gallery.html](theme-gallery.html).
+
 See [PLAN.md](PLAN.md) for scope, design decisions, and what's deliberately not built yet.

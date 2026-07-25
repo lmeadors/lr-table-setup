@@ -4,12 +4,36 @@
   <meta charset="UTF-8" />
   <title>Table Setup</title>
   <style>
+    :root {
+      --ts-font-family: system-ui, sans-serif;
+      --ts-body-bg: transparent;
+      --ts-text-color: #1a1a1a;
+      --ts-hint-color: #555;
+      --ts-border-color: #ccc;
+      --ts-success-color: #2f7a3f;
+      --ts-error-color: #a13d3d;
+
+      --ts-room-fill: #f5f5f5;
+      --ts-room-stroke: #333;
+      --ts-diagram-border: #ddd;
+
+      --ts-table-fill: #7aa6c2;
+      --ts-table-stroke: #2c4a5e;
+      --ts-table-hover-fill: #5c8aa8;
+      --ts-table-shadow-color: #2c4a5e;
+
+      --ts-obstacle-fill: #d98c8c;
+      --ts-obstacle-stroke: #a13d3d;
+      --ts-obstacle-label-color: #6b2323;
+      --ts-obstacle-row-border: #eee;
+    }
     body {
-      font-family: system-ui, sans-serif;
+      font-family: var(--ts-font-family);
       max-width: 1100px;
       margin: 2rem auto;
       padding: 0 1rem;
-      color: #1a1a1a;
+      color: var(--ts-text-color);
+      background-color: var(--ts-body-bg);
     }
     .form-row {
       display: flex;
@@ -20,7 +44,7 @@
       flex: 1 1 320px;
     }
     fieldset {
-      border: 1px solid #ccc;
+      border: 1px solid var(--ts-border-color);
       border-radius: 6px;
       margin-bottom: 1rem;
       padding: 1rem;
@@ -53,28 +77,28 @@
       font-size: 1.1rem;
     }
     .room-outline {
-      fill: #f5f5f5;
-      stroke: #333;
+      fill: var(--ts-room-fill);
+      stroke: var(--ts-room-stroke);
       stroke-width: 2;
     }
     .table {
-      fill: #7aa6c2;
-      stroke: #2c4a5e;
+      fill: var(--ts-table-fill);
+      stroke: var(--ts-table-stroke);
       stroke-width: 1;
       cursor: pointer;
     }
     .table-shadow {
-      fill: #2c4a5e;
+      fill: var(--ts-table-shadow-color);
       opacity: 0.3;
       pointer-events: none;
     }
     .table:hover {
-      fill: #5c8aa8;
+      fill: var(--ts-table-hover-fill);
     }
     .obstacle {
-      fill: #d98c8c;
+      fill: var(--ts-obstacle-fill);
       fill-opacity: 0.55;
-      stroke: #a13d3d;
+      stroke: var(--ts-obstacle-stroke);
       stroke-width: 1.5;
     }
     .obstacle-preview {
@@ -82,19 +106,19 @@
       stroke-dasharray: 5 3;
     }
     .obstacle-pinned-table {
-      fill: #7aa6c2;
+      fill: var(--ts-table-fill);
       fill-opacity: 0.55;
-      stroke: #2c4a5e;
+      stroke: var(--ts-table-stroke);
       stroke-dasharray: 4 2;
     }
     .obstacle-label {
       font-size: 11px;
-      fill: #6b2323;
+      fill: var(--ts-obstacle-label-color);
       pointer-events: none;
     }
     #diagram {
       margin-top: 1rem;
-      border: 1px solid #ddd;
+      border: 1px solid var(--ts-diagram-border);
       display: inline-block;
       touch-action: none;
       cursor: crosshair;
@@ -111,7 +135,7 @@
       align-items: flex-end;
       gap: 0.5rem;
       padding: 0.5rem;
-      border: 1px solid #eee;
+      border: 1px solid var(--ts-obstacle-row-border);
       border-radius: 4px;
     }
     .obstacle-row label {
@@ -134,7 +158,7 @@
     }
     .hint {
       font-size: 0.9rem;
-      color: #555;
+      color: var(--ts-hint-color);
       margin: 0.25rem 0 0.75rem;
     }
     #config-json {
@@ -156,10 +180,10 @@
       font-size: 0.85rem;
     }
     .config-status.error {
-      color: #a13d3d;
+      color: var(--ts-error-color);
     }
     .config-status.success {
-      color: #2f7a3f;
+      color: var(--ts-success-color);
     }
   </style>
 </head>
