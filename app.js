@@ -31,6 +31,7 @@ const configStatusEl = document.getElementById('config-status');
 let obstacles = [];
 let nextObstacleId = 1;
 let dragState = null;
+let lastStrategy = null;
 
 function populateTableCatalog() {
   tableSelect.innerHTML = tableCatalog
@@ -93,7 +94,8 @@ function update() {
   const pinnedCount = pinnedTableCount();
   const remainingGuestCount = Math.max(0, guestCount - pinnedSeats);
 
-  const result = arrange({ room, tableType, guestCount: remainingGuestCount, mode, packing, buffer });
+  const result = arrange({ room, tableType, guestCount: remainingGuestCount, mode, packing, buffer, preferredStrategy: lastStrategy });
+  lastStrategy = result.strategy;
   const roomArea = roomAreaSqFt(room);
   const areaUsed = (result.tableCount * (result.footprint.width * result.footprint.depth)) / 144;
 
@@ -324,7 +326,7 @@ diagramEl.addEventListener('pointermove', (event) => {
   const { tableType, guestCount, mode, packing, buffer } = readArrangeInputs();
   const remainingGuestCount = guestCount ? Math.max(0, guestCount - pinnedSeatsTotal()) : 0;
   const result = tableType && guestCount
-    ? arrange({ room, tableType, guestCount: remainingGuestCount, mode, packing, buffer })
+    ? arrange({ room, tableType, guestCount: remainingGuestCount, mode, packing, buffer, preferredStrategy: lastStrategy })
     : null;
 
   renderDiagram(diagramEl, room, tableType, result, preview);
