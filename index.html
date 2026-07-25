@@ -29,11 +29,26 @@
     }
     body {
       font-family: var(--ts-font-family);
-      max-width: 1100px;
+      max-width: 1500px;
       margin: 2rem auto;
       padding: 0 1rem;
       color: var(--ts-text-color);
       background-color: var(--ts-body-bg);
+    }
+    .page-layout {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-start;
+      gap: 1.5rem;
+    }
+    .controls-column {
+      flex: 1 1 500px;
+      min-width: 0;
+    }
+    .preview-column {
+      flex: 0 1 720px;
+      position: sticky;
+      top: 1rem;
     }
     .form-row {
       display: flex;
@@ -189,69 +204,75 @@
 </head>
 <body>
   <h1>Table Setup</h1>
-  <form id="arrange-form">
-    <div class="form-row">
-    <fieldset>
-      <legend>Room</legend>
-      <label>
-        Width (ft)
-        <input type="number" id="room-width" min="1" step="1" value="40" />
-      </label>
-      <label>
-        Depth (ft)
-        <input type="number" id="room-depth" min="1" step="1" value="60" />
-      </label>
-    </fieldset>
+  <div class="page-layout">
+    <div class="controls-column">
+      <form id="arrange-form">
+        <div class="form-row">
+        <fieldset>
+          <legend>Room</legend>
+          <label>
+            Width (ft)
+            <input type="number" id="room-width" min="1" step="1" value="40" />
+          </label>
+          <label>
+            Depth (ft)
+            <input type="number" id="room-depth" min="1" step="1" value="60" />
+          </label>
+        </fieldset>
 
-    <fieldset>
-      <legend>Tables</legend>
-      <label>
-        Table type
-        <select id="table-type"></select>
-      </label>
-      <label>
-        Guest count
-        <input type="number" id="guest-count" min="1" step="1" value="120" />
-      </label>
-      <label title="Defaults to this table type's catalog clearance. Lower it to pack tables tighter than recommended.">
-        Buffer (in)
-        <input type="number" id="buffer-override" min="0" step="1" />
-      </label>
-      <div class="mode-options">
-        <label><input type="radio" name="mode" value="compact" checked /> Compact</label>
-        <label><input type="radio" name="mode" value="spread" /> Spread</label>
-      </div>
-      <label id="packing-field">
-        Packing (round tables only)
-        <select id="packing">
-          <option value="auto">Auto (best fit)</option>
-          <option value="square">Square</option>
-          <option value="hex">Hex</option>
-        </select>
-      </label>
-    </fieldset>
+        <fieldset>
+          <legend>Tables</legend>
+          <label>
+            Table type
+            <select id="table-type"></select>
+          </label>
+          <label>
+            Guest count
+            <input type="number" id="guest-count" min="1" step="1" value="120" />
+          </label>
+          <label title="Defaults to this table type's catalog clearance. Lower it to pack tables tighter than recommended.">
+            Buffer (in)
+            <input type="number" id="buffer-override" min="0" step="1" />
+          </label>
+          <div class="mode-options">
+            <label><input type="radio" name="mode" value="compact" checked /> Compact</label>
+            <label><input type="radio" name="mode" value="spread" /> Spread</label>
+          </div>
+          <label id="packing-field">
+            Packing (round tables only)
+            <select id="packing">
+              <option value="auto">Auto (best fit)</option>
+              <option value="square">Square</option>
+              <option value="hex">Hex</option>
+            </select>
+          </label>
+        </fieldset>
+        </div>
+
+        <fieldset>
+          <legend>Obstacles</legend>
+          <div id="obstacle-rows"></div>
+          <button type="button" id="add-obstacle">+ Add obstacle</button>
+        </fieldset>
+      </form>
+
+      <fieldset>
+        <legend>Configuration (JSON)</legend>
+        <p class="hint">Live view of the current setup. Paste a previous config here and click Load to continue it.</p>
+        <textarea id="config-json" rows="14" spellcheck="false"></textarea>
+        <div class="config-actions">
+          <button type="button" id="load-config">Load configuration</button>
+          <span id="config-status" class="config-status"></span>
+        </div>
+      </fieldset>
     </div>
 
-    <fieldset>
-      <legend>Obstacles</legend>
-      <div id="obstacle-rows"></div>
-      <button type="button" id="add-obstacle">+ Add obstacle</button>
-    </fieldset>
-  </form>
-
-  <div id="summary"></div>
-  <p class="hint">Drag on the diagram to add an obstacle (pillar, stage, bar, door...); fine-tune or remove it in the Obstacles list above. Click a table to pin it in place &mdash; the rest reflow around it, and removing it from the Obstacles list frees that seat count back up for auto-placement.</p>
-  <div id="diagram"></div>
-
-  <fieldset>
-    <legend>Configuration (JSON)</legend>
-    <p class="hint">Live view of the current setup. Paste a previous config here and click Load to continue it.</p>
-    <textarea id="config-json" rows="14" spellcheck="false"></textarea>
-    <div class="config-actions">
-      <button type="button" id="load-config">Load configuration</button>
-      <span id="config-status" class="config-status"></span>
+    <div class="preview-column">
+      <div id="summary"></div>
+      <p class="hint">Drag on the diagram to add an obstacle (pillar, stage, bar, door...); fine-tune or remove it in the Obstacles list above. Click a table to pin it in place &mdash; the rest reflow around it, and removing it from the Obstacles list frees that seat count back up for auto-placement.</p>
+      <div id="diagram"></div>
     </div>
-  </fieldset>
+  </div>
 
   <script type="module" src="app.js"></script>
 </body>
