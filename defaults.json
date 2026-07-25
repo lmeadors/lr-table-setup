@@ -1,62 +1,83 @@
 {
   "room": {
-    "width": 120,
-    "depth": 70,
+    "width": 90,
+    "depth": 54,
     "obstacles": [
       {
-        "x": 0,
-        "y": 48,
-        "width": 48,
-        "depth": 22,
-        "label": "Bathrooms/Groom"
+        "x": 76.5,
+        "y": 0,
+        "width": 13.5,
+        "depth": 13,
+        "label": "Groom"
       },
       {
-        "x": 0,
+        "x": 64,
         "y": 0,
-        "width": 24,
-        "depth": 36,
-        "label": "Office/Bride"
+        "width": 12.5,
+        "depth": 13,
+        "label": "Men's"
       },
       {
-        "x": 24,
+        "x": 49.5,
         "y": 0,
-        "width": 30,
-        "depth": 27,
-        "label": "Kitchen"
+        "width": 14.5,
+        "depth": 13,
+        "label": "Lady's"
       },
       {
-        "x": 54,
+        "x": 37.5,
         "y": 0,
-        "width": 18,
+        "width": 12,
+        "depth": 8,
+        "label": "Entry"
+      },
+      {
+        "x": 70.5,
+        "y": 44.5,
+        "width": 19.5,
+        "depth": 9.5,
+        "label": "Office"
+      },
+      {
+        "x": 74,
+        "y": 20.5,
+        "width": 16,
         "depth": 24,
+        "label": "Bride/Utility"
+      },
+      {
+        "x": 49.5,
+        "y": 33.5,
+        "width": 24.5,
+        "depth": 20.5,
+        "label": "Kitchen/Hall"
+      },
+      {
+        "x": 33.5,
+        "y": 35.5,
+        "width": 16,
+        "depth": 18.5,
         "label": "Bar"
       },
       {
-        "x": 116,
-        "y": 0,
+        "x": 0,
+        "y": 50,
         "width": 4,
         "depth": 4,
         "label": "DJ"
       },
       {
-        "x": 72,
-        "y": 0,
-        "width": 24,
-        "depth": 12,
-        "label": "Backdoor"
-      },
-      {
-        "x": 48,
-        "y": 58,
-        "width": 24,
-        "depth": 16,
-        "label": "Entryway"
+        "x": 19.5,
+        "y": 46,
+        "width": 14,
+        "depth": 8,
+        "label": "Back Exit"
       }
     ]
   },
   "tableTypeId": "round-60",
   "guestCount": 124,
   "mode": "spread",
-  "packing": "hex",
+  "packing": "auto",
   "buffer": 30
 }
