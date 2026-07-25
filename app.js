@@ -1,7 +1,7 @@
 import { tableCatalog } from './catalog.js';
 import { arrange } from './lib/solver.js';
 import { renderDiagram, computeScale } from './lib/render.js';
-import { roomAreaSqFt } from './lib/geometry.js';
+import { roomAreaSqFt, effectiveFootprint } from './lib/geometry.js';
 
 const tableSelect = document.getElementById('table-type');
 const packingField = document.getElementById('packing-field');
@@ -42,6 +42,14 @@ function readArrangeInputs() {
   };
 }
 
+function pinnedSeatsTotal() {
+  return obstacles.reduce((sum, o) => sum + (o.seats || 0), 0);
+}
+
+function pinnedTableCount() {
+  return obstacles.filter((o) => o.seats).length;
+}
+
 function update() {
   const room = readRoom();
   const { tableType, guestCount, mode, packing } = readArrangeInputs();
@@ -54,14 +62,22 @@ function update() {
     return;
   }
 
-  const result = arrange({ room, tableType, guestCount, mode, packing });
+  const pinnedSeats = pinnedSeatsTotal();
+  const pinnedCount = pinnedTableCount();
+  const remainingGuestCount = Math.max(0, guestCount - pinnedSeats);
+
+  const result = arrange({ room, tableType, guestCount: remainingGuestCount, mode, packing });
   const roomArea = roomAreaSqFt(room);
   const areaUsed = (result.tableCount * (result.footprint.width * result.footprint.depth)) / 144;
 
+  const totalTableCount = result.tableCount + pinnedCount;
+  const totalSeatsAchieved = result.seatsAchieved + pinnedSeats;
+  const seatsShort = Math.max(0, guestCount - totalSeatsAchieved);
+
   summaryEl.innerHTML = `
-    <p>${result.tableCount} &times; ${tableType.label}</p>
-    <p>${result.seatsAchieved} of ${guestCount} guests seated${
-      result.seatsShort > 0 ? ` &mdash; short ${result.seatsShort}` : ''
+    <p>${totalTableCount} &times; ${tableType.label}${pinnedCount > 0 ? ` (${pinnedCount} pinned)` : ''}</p>
+    <p>${totalSeatsAchieved} of ${guestCount} guests seated${
+      seatsShort > 0 ? ` &mdash; short ${seatsShort}` : ''
     }</p>
     <p>Room area: ${roomArea.toFixed(0)} sq ft &middot; used: ${areaUsed.toFixed(0)} sq ft &middot; remaining: ${(roomArea - areaUsed).toFixed(0)} sq ft</p>
   `;
@@ -77,7 +93,10 @@ function currentConfig() {
     room: {
       width: room.width,
       depth: room.depth,
-      obstacles: room.obstacles.map(({ x, y, width, depth, label }) => ({ x, y, width, depth, label })),
+      obstacles: room.obstacles.map(({ x, y, width, depth, label, seats }) => ({
+        x, y, width, depth, label,
+        ...(seats ? { seats } : {}),
+      })),
     },
     tableTypeId: tableType ? tableType.id : null,
     guestCount,
@@ -123,6 +142,7 @@ function applyConfig(config) {
       width: o.width,
       depth: o.depth,
       label: typeof o.label === 'string' ? o.label : 'Obstacle',
+      ...(typeof o.seats === 'number' && o.seats > 0 ? { seats: o.seats } : {}),
     });
   }
 
@@ -231,6 +251,8 @@ function pointerToFeet(event, room, scale, containerRect) {
 }
 
 diagramEl.addEventListener('pointerdown', (event) => {
+  if (event.target.closest('.table')) return;
+
   const room = readRoom();
   if (!room.width || !room.depth) return;
 
@@ -252,11 +274,38 @@ diagramEl.addEventListener('pointermove', (event) => {
   const preview = normalizeDragRect(startXFt, startYFt, xFt, yFt, room);
 
   const { tableType, guestCount, mode, packing } = readArrangeInputs();
+  const remainingGuestCount = guestCount ? Math.max(0, guestCount - pinnedSeatsTotal()) : 0;
   const result = tableType && guestCount
-    ? arrange({ room, tableType, guestCount, mode, packing })
+    ? arrange({ room, tableType, guestCount: remainingGuestCount, mode, packing })
     : null;
 
   renderDiagram(diagramEl, room, tableType, result, preview);
+});
+
+diagramEl.addEventListener('click', (event) => {
+  const tableEl = event.target.closest('.table');
+  if (!tableEl) return;
+
+  const { tableType } = readArrangeInputs();
+  if (!tableType) return;
+
+  const footprint = effectiveFootprint(tableType);
+  const xFt = Number(tableEl.dataset.x) / 12;
+  const yFt = Number(tableEl.dataset.y) / 12;
+  const wFt = footprint.width / 12;
+  const dFt = footprint.depth / 12;
+
+  obstacles.push({
+    id: nextObstacleId++,
+    x: round1(Math.max(0, xFt - wFt / 2)),
+    y: round1(Math.max(0, yFt - dFt / 2)),
+    width: round1(wFt),
+    depth: round1(dFt),
+    label: `${tableType.label} (pinned)`,
+    seats: tableType.seats,
+  });
+  renderObstacleRows();
+  update();
 });
 
 diagramEl.addEventListener('pointerup', (event) => {
