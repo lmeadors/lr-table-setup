@@ -1,9 +1,10 @@
 import { tableCatalog } from './catalog.js';
 import { arrange } from './lib/solver.js';
 import { renderDiagram, computeScale } from './lib/render.js';
-import { roomAreaSqFt, effectiveFootprint } from './lib/geometry.js';
+import { roomAreaSqFt, effectiveFootprintForBuffer } from './lib/geometry.js';
 
 const tableSelect = document.getElementById('table-type');
+const bufferInput = document.getElementById('buffer-override');
 const packingField = document.getElementById('packing-field');
 const packingSelect = document.getElementById('packing');
 const form = document.getElementById('arrange-form');
@@ -34,12 +35,26 @@ function readRoom() {
 }
 
 function readArrangeInputs() {
+  const tableType = tableCatalog.find((t) => t.id === tableSelect.value);
+  const bufferValue = Number(bufferInput.value);
+  const buffer = Number.isFinite(bufferValue) && bufferValue >= 0
+    ? bufferValue
+    : (tableType ? tableType.clearanceBuffer : 0);
+
   return {
-    tableType: tableCatalog.find((t) => t.id === tableSelect.value),
+    tableType,
     guestCount: Number(document.getElementById('guest-count').value),
     mode: document.querySelector('input[name="mode"]:checked').value,
     packing: packingSelect.value,
+    buffer,
   };
+}
+
+function resetBufferToDefault() {
+  const tableType = tableCatalog.find((t) => t.id === tableSelect.value);
+  if (tableType) {
+    bufferInput.value = tableType.clearanceBuffer;
+  }
 }
 
 function pinnedSeatsTotal() {
@@ -52,7 +67,7 @@ function pinnedTableCount() {
 
 function update() {
   const room = readRoom();
-  const { tableType, guestCount, mode, packing } = readArrangeInputs();
+  const { tableType, guestCount, mode, packing, buffer } = readArrangeInputs();
 
   packingField.hidden = !tableType || tableType.shape !== 'round';
 
@@ -66,7 +81,7 @@ function update() {
   const pinnedCount = pinnedTableCount();
   const remainingGuestCount = Math.max(0, guestCount - pinnedSeats);
 
-  const result = arrange({ room, tableType, guestCount: remainingGuestCount, mode, packing });
+  const result = arrange({ room, tableType, guestCount: remainingGuestCount, mode, packing, buffer });
   const roomArea = roomAreaSqFt(room);
   const areaUsed = (result.tableCount * (result.footprint.width * result.footprint.depth)) / 144;
 
@@ -88,7 +103,7 @@ function update() {
 
 function currentConfig() {
   const room = readRoom();
-  const { tableType, guestCount, mode, packing } = readArrangeInputs();
+  const { tableType, guestCount, mode, packing, buffer } = readArrangeInputs();
   return {
     room: {
       width: room.width,
@@ -102,6 +117,7 @@ function currentConfig() {
     guestCount,
     mode,
     packing,
+    buffer,
   };
 }
 
@@ -157,11 +173,15 @@ function applyConfig(config) {
 
   const mode = config.mode === 'spread' ? 'spread' : 'compact';
   const packing = ['square', 'hex'].includes(config.packing) ? config.packing : 'auto';
+  const buffer = typeof config.buffer === 'number' && config.buffer >= 0
+    ? config.buffer
+    : tableType.clearanceBuffer;
 
   document.getElementById('room-width').value = room.width;
   document.getElementById('room-depth').value = room.depth;
   document.getElementById('guest-count').value = config.guestCount;
   tableSelect.value = tableType.id;
+  bufferInput.value = buffer;
   document.querySelector(`input[name="mode"][value="${mode}"]`).checked = true;
   packingSelect.value = packing;
 
@@ -273,10 +293,10 @@ diagramEl.addEventListener('pointermove', (event) => {
   const { xFt, yFt } = pointerToFeet(event, room, scale, containerRect);
   const preview = normalizeDragRect(startXFt, startYFt, xFt, yFt, room);
 
-  const { tableType, guestCount, mode, packing } = readArrangeInputs();
+  const { tableType, guestCount, mode, packing, buffer } = readArrangeInputs();
   const remainingGuestCount = guestCount ? Math.max(0, guestCount - pinnedSeatsTotal()) : 0;
   const result = tableType && guestCount
-    ? arrange({ room, tableType, guestCount: remainingGuestCount, mode, packing })
+    ? arrange({ room, tableType, guestCount: remainingGuestCount, mode, packing, buffer })
     : null;
 
   renderDiagram(diagramEl, room, tableType, result, preview);
@@ -286,10 +306,10 @@ diagramEl.addEventListener('click', (event) => {
   const tableEl = event.target.closest('.table');
   if (!tableEl) return;
 
-  const { tableType } = readArrangeInputs();
+  const { tableType, buffer } = readArrangeInputs();
   if (!tableType) return;
 
-  const footprint = effectiveFootprint(tableType);
+  const footprint = effectiveFootprintForBuffer(tableType, buffer);
   const xFt = Number(tableEl.dataset.x) / 12;
   const yFt = Number(tableEl.dataset.y) / 12;
   const wFt = footprint.width / 12;
@@ -344,7 +364,13 @@ addObstacleBtn.addEventListener('click', () => {
   update();
 });
 
+tableSelect.addEventListener('change', () => {
+  resetBufferToDefault();
+  update();
+});
+
 form.addEventListener('input', update);
 
 populateTableCatalog();
+resetBufferToDefault();
 update();
