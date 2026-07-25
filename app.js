@@ -120,10 +120,10 @@ function currentConfig() {
     room: {
       width: room.width,
       depth: room.depth,
-      obstacles: room.obstacles.map(({ x, y, width, depth, label, shape, seats }) => ({
+      obstacles: room.obstacles.map(({ x, y, width, depth, label, shape, seats, tableWidth, tableDepth }) => ({
         x, y, width, depth, label,
         shape: shape === 'round' ? 'round' : 'rect',
-        ...(seats ? { seats } : {}),
+        ...(seats ? { seats, tableWidth, tableDepth } : {}),
       })),
     },
     tableTypeId: tableType ? tableType.id : null,
@@ -165,6 +165,8 @@ function applyConfig(config) {
       return { ok: false, error: 'Each obstacle needs numeric x, y, width, depth.' };
     }
     const shape = o.shape === 'round' ? 'round' : 'rect';
+    const hasSeats = typeof o.seats === 'number' && o.seats > 0;
+    const hasTableSize = typeof o.tableWidth === 'number' && typeof o.tableDepth === 'number';
     parsedObstacles.push({
       id: nextObstacleId++,
       x: o.x,
@@ -173,7 +175,8 @@ function applyConfig(config) {
       depth: shape === 'round' ? o.width : o.depth,
       label: typeof o.label === 'string' ? o.label : 'Obstacle',
       shape,
-      ...(typeof o.seats === 'number' && o.seats > 0 ? { seats: o.seats } : {}),
+      ...(hasSeats ? { seats: o.seats } : {}),
+      ...(hasSeats && hasTableSize ? { tableWidth: o.tableWidth, tableDepth: o.tableDepth } : {}),
     });
   }
 
@@ -339,6 +342,8 @@ diagramEl.addEventListener('click', (event) => {
   const yFt = Number(tableEl.dataset.y) / 12;
   const wFt = footprint.width / 12;
   const dFt = footprint.depth / 12;
+  const tableWFt = (tableType.shape === 'round' ? tableType.dimensions.diameter : tableType.dimensions.width) / 12;
+  const tableDFt = (tableType.shape === 'round' ? tableType.dimensions.diameter : tableType.dimensions.depth) / 12;
 
   obstacles.push({
     id: nextObstacleId++,
@@ -349,6 +354,8 @@ diagramEl.addEventListener('click', (event) => {
     label: `${tableType.label} (pinned)`,
     shape: tableType.shape === 'round' ? 'round' : 'rect',
     seats: tableType.seats,
+    tableWidth: round1(tableWFt),
+    tableDepth: round1(tableDFt),
   });
   renderObstacleRows();
   update();
