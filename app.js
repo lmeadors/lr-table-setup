@@ -383,6 +383,21 @@ tableSelect.addEventListener('change', () => {
 
 form.addEventListener('input', update);
 
+async function loadDefaults() {
+  try {
+    const response = await fetch('defaults.json');
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const defaults = await response.json();
+    const result = applyConfig(defaults);
+    if (!result.ok) {
+      console.warn('defaults.json is invalid, falling back to built-in form defaults:', result.error);
+    }
+  } catch (err) {
+    console.warn('Could not load defaults.json, falling back to built-in form defaults.', err);
+  }
+}
+
 populateTableCatalog();
 resetBufferToDefault();
+await loadDefaults();
 update();

@@ -14,6 +14,10 @@ python3 -m http.server 8080
 
 Then open `http://localhost:8080/index.html`.
 
+## Changing the starting defaults
+
+The values the form loads with (room size, obstacles, table type, guest count, mode, packing, buffer) live in [defaults.json](defaults.json), in the same shape as the Configuration (JSON) box in the app itself. Edit it directly — no code changes needed. If it's missing or invalid, the app falls back to the values baked into `index.html`'s form fields.
+
 ## Embedding and styling
 
 To fit it into another site, see [STYLING.md](STYLING.md) — CSS custom properties for theming, plus iframe and inline embed recipes. Preview built-in themes and copy their CSS at [theme-gallery.html](theme-gallery.html).

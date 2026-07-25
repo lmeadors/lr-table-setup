@@ -1,0 +1,62 @@
+{
+  "room": {
+    "width": 120,
+    "depth": 70,
+    "obstacles": [
+      {
+        "x": 0,
+        "y": 48,
+        "width": 48,
+        "depth": 22,
+        "label": "Bathrooms/Groom"
+      },
+      {
+        "x": 0,
+        "y": 0,
+        "width": 24,
+        "depth": 36,
+        "label": "Office/Bride"
+      },
+      {
+        "x": 24,
+        "y": 0,
+        "width": 30,
+        "depth": 27,
+        "label": "Kitchen"
+      },
+      {
+        "x": 54,
+        "y": 0,
+        "width": 18,
+        "depth": 24,
+        "label": "Bar"
+      },
+      {
+        "x": 116,
+        "y": 0,
+        "width": 4,
+        "depth": 4,
+        "label": "DJ"
+      },
+      {
+        "x": 72,
+        "y": 0,
+        "width": 24,
+        "depth": 12,
+        "label": "Backdoor"
+      },
+      {
+        "x": 48,
+        "y": 58,
+        "width": 24,
+        "depth": 16,
+        "label": "Entryway"
+      }
+    ]
+  },
+  "tableTypeId": "round-60",
+  "guestCount": 124,
+  "mode": "spread",
+  "packing": "hex",
+  "buffer": 30
+}
