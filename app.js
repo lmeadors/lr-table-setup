@@ -11,6 +11,9 @@ const summaryEl = document.getElementById('summary');
 const diagramEl = document.getElementById('diagram');
 const obstacleRowsEl = document.getElementById('obstacle-rows');
 const addObstacleBtn = document.getElementById('add-obstacle');
+const configJsonEl = document.getElementById('config-json');
+const loadConfigBtn = document.getElementById('load-config');
+const configStatusEl = document.getElementById('config-status');
 
 let obstacles = [];
 let nextObstacleId = 1;
@@ -64,7 +67,108 @@ function update() {
   `;
 
   renderDiagram(diagramEl, room, tableType, result);
+  syncConfigJson();
 }
+
+function currentConfig() {
+  const room = readRoom();
+  const { tableType, guestCount, mode, packing } = readArrangeInputs();
+  return {
+    room: {
+      width: room.width,
+      depth: room.depth,
+      obstacles: room.obstacles.map(({ x, y, width, depth, label }) => ({ x, y, width, depth, label })),
+    },
+    tableTypeId: tableType ? tableType.id : null,
+    guestCount,
+    mode,
+    packing,
+  };
+}
+
+function syncConfigJson() {
+  if (document.activeElement === configJsonEl) return;
+  configJsonEl.value = JSON.stringify(currentConfig(), null, 2);
+}
+
+function setConfigStatus(message, kind) {
+  configStatusEl.textContent = message;
+  configStatusEl.className = `config-status${kind ? ` ${kind}` : ''}`;
+}
+
+function applyConfig(config) {
+  if (!config || typeof config !== 'object') {
+    return { ok: false, error: 'Config must be a JSON object.' };
+  }
+
+  const room = config.room;
+  if (!room || typeof room.width !== 'number' || typeof room.depth !== 'number' || room.width <= 0 || room.depth <= 0) {
+    return { ok: false, error: 'room.width and room.depth must be positive numbers.' };
+  }
+
+  const rawObstacles = Array.isArray(room.obstacles) ? room.obstacles : [];
+  const parsedObstacles = [];
+  for (const o of rawObstacles) {
+    if (
+      !o || typeof o !== 'object' ||
+      typeof o.x !== 'number' || typeof o.y !== 'number' ||
+      typeof o.width !== 'number' || typeof o.depth !== 'number'
+    ) {
+      return { ok: false, error: 'Each obstacle needs numeric x, y, width, depth.' };
+    }
+    parsedObstacles.push({
+      id: nextObstacleId++,
+      x: o.x,
+      y: o.y,
+      width: o.width,
+      depth: o.depth,
+      label: typeof o.label === 'string' ? o.label : 'Obstacle',
+    });
+  }
+
+  const tableType = tableCatalog.find((t) => t.id === config.tableTypeId);
+  if (!tableType) {
+    return { ok: false, error: `Unknown tableTypeId: ${JSON.stringify(config.tableTypeId)}` };
+  }
+
+  if (typeof config.guestCount !== 'number' || config.guestCount <= 0) {
+    return { ok: false, error: 'guestCount must be a positive number.' };
+  }
+
+  const mode = config.mode === 'spread' ? 'spread' : 'compact';
+  const packing = ['square', 'hex'].includes(config.packing) ? config.packing : 'auto';
+
+  document.getElementById('room-width').value = room.width;
+  document.getElementById('room-depth').value = room.depth;
+  document.getElementById('guest-count').value = config.guestCount;
+  tableSelect.value = tableType.id;
+  document.querySelector(`input[name="mode"][value="${mode}"]`).checked = true;
+  packingSelect.value = packing;
+
+  obstacles = parsedObstacles;
+  renderObstacleRows();
+
+  return { ok: true };
+}
+
+loadConfigBtn.addEventListener('click', () => {
+  let parsed;
+  try {
+    parsed = JSON.parse(configJsonEl.value);
+  } catch (err) {
+    setConfigStatus(`Invalid JSON: ${err.message}`, 'error');
+    return;
+  }
+
+  const result = applyConfig(parsed);
+  if (!result.ok) {
+    setConfigStatus(result.error, 'error');
+    return;
+  }
+
+  setConfigStatus('Loaded.', 'success');
+  update();
+});
 
 function escapeHtml(value) {
   return String(value).replace(/[&<>"']/g, (c) => ({

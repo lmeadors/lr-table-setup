@@ -122,6 +122,30 @@
       color: #555;
       margin: 0.25rem 0 0.75rem;
     }
+    #config-json {
+      width: 100%;
+      max-width: 100%;
+      box-sizing: border-box;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.85rem;
+      padding: 0.5rem;
+      resize: vertical;
+    }
+    .config-actions {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-top: 0.5rem;
+    }
+    .config-status {
+      font-size: 0.85rem;
+    }
+    .config-status.error {
+      color: #a13d3d;
+    }
+    .config-status.success {
+      color: #2f7a3f;
+    }
   </style>
 </head>
 <body>
@@ -175,6 +199,16 @@
   <div id="summary"></div>
   <p class="hint">Drag on the diagram to add an obstacle (pillar, stage, bar, door...); fine-tune or remove it in the Obstacles list above.</p>
   <div id="diagram"></div>
+
+  <fieldset>
+    <legend>Configuration (JSON)</legend>
+    <p class="hint">Live view of the current setup. Paste a previous config here and click Load to continue it.</p>
+    <textarea id="config-json" rows="14" spellcheck="false"></textarea>
+    <div class="config-actions">
+      <button type="button" id="load-config">Load configuration</button>
+      <span id="config-status" class="config-status"></span>
+    </div>
+  </fieldset>
 
   <script type="module" src="app.js"></script>
 </body>
