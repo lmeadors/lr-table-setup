@@ -62,10 +62,65 @@
       stroke: #2c4a5e;
       stroke-width: 1;
     }
+    .obstacle {
+      fill: #d98c8c;
+      fill-opacity: 0.55;
+      stroke: #a13d3d;
+      stroke-width: 1.5;
+    }
+    .obstacle-preview {
+      fill-opacity: 0.3;
+      stroke-dasharray: 5 3;
+    }
+    .obstacle-label {
+      font-size: 11px;
+      fill: #6b2323;
+      pointer-events: none;
+    }
     #diagram {
       margin-top: 1rem;
       border: 1px solid #ddd;
       display: inline-block;
+      touch-action: none;
+      cursor: crosshair;
+    }
+    #obstacle-rows {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      margin-bottom: 0.75rem;
+    }
+    .obstacle-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-end;
+      gap: 0.5rem;
+      padding: 0.5rem;
+      border: 1px solid #eee;
+      border-radius: 4px;
+    }
+    .obstacle-row label {
+      margin-bottom: 0;
+      font-size: 0.85rem;
+    }
+    .obstacle-row input[type="number"] {
+      width: 5rem;
+      max-width: 5rem;
+    }
+    .obstacle-row input[type="text"] {
+      width: 8rem;
+      padding: 0.4rem;
+      margin-top: 0.25rem;
+    }
+    .remove-obstacle {
+      height: 2.1rem;
+      padding: 0 0.6rem;
+      cursor: pointer;
+    }
+    .hint {
+      font-size: 0.9rem;
+      color: #555;
+      margin: 0.25rem 0 0.75rem;
     }
   </style>
 </head>
@@ -76,13 +131,6 @@
     <fieldset>
       <legend>Room</legend>
       <label>
-        Shape
-        <select id="room-shape">
-          <option value="rectangle">Rectangle</option>
-          <option value="l-shape">L-shape</option>
-        </select>
-      </label>
-      <label>
         Width (ft)
         <input type="number" id="room-width" min="1" step="1" value="40" />
       </label>
@@ -90,25 +138,6 @@
         Depth (ft)
         <input type="number" id="room-depth" min="1" step="1" value="60" />
       </label>
-      <div id="notch-fields" hidden>
-        <label>
-          Notch width (ft)
-          <input type="number" id="notch-width" min="0" step="1" value="10" />
-        </label>
-        <label>
-          Notch depth (ft)
-          <input type="number" id="notch-depth" min="0" step="1" value="15" />
-        </label>
-        <label>
-          Notch corner
-          <select id="notch-corner">
-            <option value="top-left">Top-left</option>
-            <option value="top-right">Top-right</option>
-            <option value="bottom-left">Bottom-left</option>
-            <option value="bottom-right">Bottom-right</option>
-          </select>
-        </label>
-      </div>
     </fieldset>
 
     <fieldset>
@@ -135,9 +164,16 @@
       </label>
     </fieldset>
     </div>
+
+    <fieldset>
+      <legend>Obstacles</legend>
+      <div id="obstacle-rows"></div>
+      <button type="button" id="add-obstacle">+ Add obstacle</button>
+    </fieldset>
   </form>
 
   <div id="summary"></div>
+  <p class="hint">Drag on the diagram to add an obstacle (pillar, stage, bar, door...); fine-tune or remove it in the Obstacles list above.</p>
   <div id="diagram"></div>
 
   <script type="module" src="app.js"></script>
