@@ -120,8 +120,9 @@ function currentConfig() {
     room: {
       width: room.width,
       depth: room.depth,
-      obstacles: room.obstacles.map(({ x, y, width, depth, label, seats }) => ({
+      obstacles: room.obstacles.map(({ x, y, width, depth, label, shape, seats }) => ({
         x, y, width, depth, label,
+        shape: shape === 'round' ? 'round' : 'rect',
         ...(seats ? { seats } : {}),
       })),
     },
@@ -163,13 +164,15 @@ function applyConfig(config) {
     ) {
       return { ok: false, error: 'Each obstacle needs numeric x, y, width, depth.' };
     }
+    const shape = o.shape === 'round' ? 'round' : 'rect';
     parsedObstacles.push({
       id: nextObstacleId++,
       x: o.x,
       y: o.y,
       width: o.width,
-      depth: o.depth,
+      depth: shape === 'round' ? o.width : o.depth,
       label: typeof o.label === 'string' ? o.label : 'Obstacle',
+      shape,
       ...(typeof o.seats === 'number' && o.seats > 0 ? { seats: o.seats } : {}),
     });
   }
@@ -233,16 +236,25 @@ function escapeHtml(value) {
 }
 
 function renderObstacleRows() {
-  obstacleRowsEl.innerHTML = obstacles.map((o) => `
+  obstacleRowsEl.innerHTML = obstacles.map((o) => {
+    const isRound = o.shape === 'round';
+    return `
     <div class="obstacle-row" data-id="${o.id}">
       <label>X (ft)<input type="number" step="0.5" min="0" value="${o.x}" data-field="x" /></label>
       <label>Y (ft)<input type="number" step="0.5" min="0" value="${o.y}" data-field="y" /></label>
-      <label>Width (ft)<input type="number" step="0.5" min="0.5" value="${o.width}" data-field="width" /></label>
-      <label>Depth (ft)<input type="number" step="0.5" min="0.5" value="${o.depth}" data-field="depth" /></label>
+      <label>${isRound ? 'Diameter (ft)' : 'Width (ft)'}<input type="number" step="0.5" min="0.5" value="${o.width}" data-field="width" /></label>
+      ${isRound ? '' : `<label>Depth (ft)<input type="number" step="0.5" min="0.5" value="${o.depth}" data-field="depth" /></label>`}
+      <label>Shape
+        <select data-field="shape">
+          <option value="rect"${isRound ? '' : ' selected'}>Rectangle</option>
+          <option value="round"${isRound ? ' selected' : ''}>Round</option>
+        </select>
+      </label>
       <label>Label<input type="text" value="${escapeHtml(o.label)}" data-field="label" /></label>
       <button type="button" class="remove-obstacle" data-id="${o.id}">Remove</button>
     </div>
-  `).join('');
+  `;
+  }).join('');
 }
 
 function addObstacle(partial) {
@@ -253,6 +265,7 @@ function addObstacle(partial) {
     width: 5,
     depth: 5,
     label: 'Obstacle',
+    shape: 'rect',
     ...partial,
   });
   renderObstacleRows();
@@ -334,6 +347,7 @@ diagramEl.addEventListener('click', (event) => {
     width: round1(wFt),
     depth: round1(dFt),
     label: `${tableType.label} (pinned)`,
+    shape: tableType.shape === 'round' ? 'round' : 'rect',
     seats: tableType.seats,
   });
   renderObstacleRows();
@@ -360,7 +374,16 @@ obstacleRowsEl.addEventListener('input', (event) => {
   if (!obstacle) return;
 
   const field = event.target.dataset.field;
-  obstacle[field] = field === 'label' ? event.target.value : Number(event.target.value);
+  obstacle[field] = (field === 'label' || field === 'shape') ? event.target.value : Number(event.target.value);
+
+  if (field === 'shape' || (field === 'width' && obstacle.shape === 'round')) {
+    obstacle.depth = obstacle.width;
+  }
+
+  if (field === 'shape') {
+    renderObstacleRows();
+  }
+
   update();
 });
 
