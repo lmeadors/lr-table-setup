@@ -138,38 +138,47 @@
       touch-action: none;
       cursor: crosshair;
     }
-    #obstacle-rows {
-      display: flex;
-      flex-direction: column;
-      gap: 0.5rem;
+.obstacle-table-wrap {
+      overflow-x: auto;
       margin-bottom: 0.75rem;
     }
-    .obstacle-row {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: flex-end;
-      gap: 0.5rem;
-      padding: 0.5rem;
-      border: 1px solid var(--ts-obstacle-row-border);
-      border-radius: 4px;
+    .obstacle-table {
+      border-collapse: collapse;
+      width: 100%;
     }
-    .obstacle-row label {
-      margin-bottom: 0;
-      font-size: 0.85rem;
+    .obstacle-table th {
+      text-align: left;
+      font-size: 0.8rem;
+      font-weight: 600;
+      padding: 0.3rem 0.5rem;
+      border-bottom: 2px solid var(--ts-obstacle-row-border);
+      white-space: nowrap;
     }
-    .obstacle-row input[type="number"] {
-      width: 5rem;
-      max-width: 5rem;
+    .obstacle-table td {
+      padding: 0.3rem 0.5rem;
+      border-bottom: 1px solid var(--ts-obstacle-row-border);
+      vertical-align: middle;
     }
-    .obstacle-row input[type="text"] {
-      width: 8rem;
+    .obstacle-table input[type="number"] {
+      width: 4.5rem;
+      max-width: 4.5rem;
+      margin-top: 0;
+    }
+    .obstacle-table input[type="text"] {
+      width: 100%;
+      min-width: 8rem;
+      margin-top: 0;
       padding: 0.4rem;
-      margin-top: 0.25rem;
+    }
+    .obstacle-table select {
+      margin-top: 0;
+      width: 6.5rem;
     }
     .remove-obstacle {
       height: 2.1rem;
       padding: 0 0.6rem;
       cursor: pointer;
+      white-space: nowrap;
     }
     .hint {
       font-size: 0.9rem;
@@ -251,7 +260,22 @@
 
         <fieldset>
           <legend>Obstacles</legend>
-          <div id="obstacle-rows"></div>
+          <div class="obstacle-table-wrap">
+            <table class="obstacle-table">
+              <thead>
+                <tr>
+                  <th>X (ft)</th>
+                  <th>Y (ft)</th>
+                  <th>Width (ft)</th>
+                  <th>Depth (ft)</th>
+                  <th>Shape</th>
+                  <th>Label</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="obstacle-rows"></tbody>
+            </table>
+          </div>
           <button type="button" id="add-obstacle">+ Add obstacle</button>
         </fieldset>
       </form>

@@ -244,20 +244,20 @@ function renderObstacleRows() {
   obstacleRowsEl.innerHTML = obstacles.map((o) => {
     const isRound = o.shape === 'round';
     return `
-    <div class="obstacle-row" data-id="${o.id}">
-      <label>X (ft)<input type="number" step="0.5" min="0" value="${o.x}" data-field="x" /></label>
-      <label>Y (ft)<input type="number" step="0.5" min="0" value="${o.y}" data-field="y" /></label>
-      <label>${isRound ? 'Diameter (ft)' : 'Width (ft)'}<input type="number" step="0.5" min="0.5" value="${o.width}" data-field="width" /></label>
-      ${isRound ? '' : `<label>Depth (ft)<input type="number" step="0.5" min="0.5" value="${o.depth}" data-field="depth" /></label>`}
-      <label>Shape
+    <tr data-id="${o.id}">
+      <td><input type="number" step="0.5" min="0" value="${o.x}" data-field="x" /></td>
+      <td><input type="number" step="0.5" min="0" value="${o.y}" data-field="y" /></td>
+      <td><input type="number" step="0.5" min="0.5" value="${o.width}" data-field="width" /></td>
+      <td><input type="number" step="0.5" min="0.5" value="${o.depth}" data-field="depth" ${isRound ? 'disabled title="A round obstacle\'s depth always matches its width (diameter)."' : ''} /></td>
+      <td>
         <select data-field="shape">
           <option value="rect"${isRound ? '' : ' selected'}>Rectangle</option>
           <option value="round"${isRound ? ' selected' : ''}>Round</option>
         </select>
-      </label>
-      <label>Label<input type="text" value="${escapeHtml(o.label)}" data-field="label" /></label>
-      <button type="button" class="remove-obstacle" data-id="${o.id}">Remove</button>
-    </div>
+      </td>
+      <td><input type="text" value="${escapeHtml(o.label)}" data-field="label" /></td>
+      <td><button type="button" class="remove-obstacle" data-id="${o.id}">Remove</button></td>
+    </tr>
   `;
   }).join('');
 }
@@ -377,7 +377,7 @@ diagramEl.addEventListener('pointerup', (event) => {
 });
 
 obstacleRowsEl.addEventListener('input', (event) => {
-  const row = event.target.closest('.obstacle-row');
+  const row = event.target.closest('tr');
   if (!row) return;
   const obstacle = obstacles.find((o) => o.id === Number(row.dataset.id));
   if (!obstacle) return;
