@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Table Setup</title>
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      max-width: 900px;
+      margin: 2rem auto;
+      padding: 0 1rem;
+      color: #1a1a1a;
+    }
+    fieldset {
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      margin-bottom: 1rem;
+      padding: 1rem;
+    }
+    label {
+      display: block;
+      margin-bottom: 0.75rem;
+    }
+    input[type="number"], select {
+      display: block;
+      width: 100%;
+      max-width: 200px;
+      padding: 0.4rem;
+      margin-top: 0.25rem;
+    }
+    .mode-options {
+      display: flex;
+      gap: 1.5rem;
+    }
+    .mode-options label {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+    #summary p {
+      margin: 0.25rem 0;
+      font-size: 1.1rem;
+    }
+    .room-outline {
+      fill: #f5f5f5;
+      stroke: #333;
+      stroke-width: 2;
+    }
+    .table {
+      fill: #7aa6c2;
+      stroke: #2c4a5e;
+      stroke-width: 1;
+    }
+    #diagram {
+      margin-top: 1rem;
+      border: 1px solid #ddd;
+      display: inline-block;
+    }
+  </style>
+</head>
+<body>
+  <h1>Table Setup</h1>
+  <form id="arrange-form">
+    <fieldset>
+      <legend>Room</legend>
+      <label>
+        Shape
+        <select id="room-shape">
+          <option value="rectangle">Rectangle</option>
+          <option value="l-shape">L-shape</option>
+        </select>
+      </label>
+      <label>
+        Width (ft)
+        <input type="number" id="room-width" min="1" step="1" value="40" />
+      </label>
+      <label>
+        Depth (ft)
+        <input type="number" id="room-depth" min="1" step="1" value="60" />
+      </label>
+      <div id="notch-fields" hidden>
+        <label>
+          Notch width (ft)
+          <input type="number" id="notch-width" min="0" step="1" value="10" />
+        </label>
+        <label>
+          Notch depth (ft)
+          <input type="number" id="notch-depth" min="0" step="1" value="15" />
+        </label>
+        <label>
+          Notch corner
+          <select id="notch-corner">
+            <option value="top-left">Top-left</option>
+            <option value="top-right">Top-right</option>
+            <option value="bottom-left">Bottom-left</option>
+            <option value="bottom-right">Bottom-right</option>
+          </select>
+        </label>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Tables</legend>
+      <label>
+        Table type
+        <select id="table-type"></select>
+      </label>
+      <label>
+        Guest count
+        <input type="number" id="guest-count" min="1" step="1" value="120" />
+      </label>
+      <div class="mode-options">
+        <label><input type="radio" name="mode" value="compact" checked /> Compact</label>
+        <label><input type="radio" name="mode" value="spread" /> Spread</label>
+      </div>
+    </fieldset>
+  </form>
+
+  <div id="summary"></div>
+  <div id="diagram"></div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
