@@ -17,6 +17,9 @@
       margin-bottom: 1rem;
       padding: 1rem;
     }
+    [hidden] {
+      display: none !important;
+    }
     label {
       display: block;
       margin-bottom: 0.75rem;
@@ -113,6 +116,14 @@
         <label><input type="radio" name="mode" value="compact" checked /> Compact</label>
         <label><input type="radio" name="mode" value="spread" /> Spread</label>
       </div>
+      <label id="packing-field">
+        Packing (round tables only)
+        <select id="packing">
+          <option value="auto">Auto (best fit)</option>
+          <option value="square">Square</option>
+          <option value="hex">Hex</option>
+        </select>
+      </label>
     </fieldset>
   </form>
 

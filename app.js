@@ -6,6 +6,8 @@ import { roomAreaSqFt } from './lib/geometry.js';
 const shapeSelect = document.getElementById('room-shape');
 const notchFields = document.getElementById('notch-fields');
 const tableSelect = document.getElementById('table-type');
+const packingField = document.getElementById('packing-field');
+const packingSelect = document.getElementById('packing');
 const form = document.getElementById('arrange-form');
 const summaryEl = document.getElementById('summary');
 const diagramEl = document.getElementById('diagram');
@@ -38,6 +40,9 @@ function update() {
   const tableType = tableCatalog.find((t) => t.id === tableSelect.value);
   const guestCount = Number(document.getElementById('guest-count').value);
   const mode = document.querySelector('input[name="mode"]:checked').value;
+  const packing = packingSelect.value;
+
+  packingField.hidden = !tableType || tableType.shape !== 'round';
 
   if (!tableType || !guestCount || !room.width || !room.depth) {
     summaryEl.innerHTML = '';
@@ -45,7 +50,7 @@ function update() {
     return;
   }
 
-  const result = arrange({ room, tableType, guestCount, mode });
+  const result = arrange({ room, tableType, guestCount, mode, packing });
   const roomArea = roomAreaSqFt(room);
   const areaUsed = result.tableCount * (result.footprint.width * result.footprint.depth) / 144;
 
