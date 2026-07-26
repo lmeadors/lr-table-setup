@@ -284,6 +284,14 @@
 
       <fieldset>
         <legend>Configuration (JSON)</legend>
+        <label>
+          Starting point
+          <select id="preset-select"></select>
+        </label>
+        <div class="config-actions">
+          <button type="button" id="load-preset">Load starting point</button>
+          <span id="preset-status" class="config-status"></span>
+        </div>
         <p class="hint">Live view of the current setup. Paste a previous config here and click Load to continue it.</p>
         <textarea id="config-json" rows="14" spellcheck="false"></textarea>
         <div class="config-actions">

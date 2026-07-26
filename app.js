@@ -27,6 +27,9 @@ const addObstacleBtn = document.getElementById('add-obstacle');
 const configJsonEl = document.getElementById('config-json');
 const loadConfigBtn = document.getElementById('load-config');
 const configStatusEl = document.getElementById('config-status');
+const presetSelectEl = document.getElementById('preset-select');
+const loadPresetBtn = document.getElementById('load-preset');
+const presetStatusEl = document.getElementById('preset-status');
 
 let obstacles = [];
 let nextObstacleId = 1;
@@ -211,6 +214,48 @@ function applyConfig(config) {
 
   return { ok: true };
 }
+
+function setPresetStatus(message, kind) {
+  presetStatusEl.textContent = message;
+  presetStatusEl.className = `config-status${kind ? ` ${kind}` : ''}`;
+}
+
+async function loadPresetManifest() {
+  try {
+    const response = await fetch('presets/manifest.json');
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const manifest = await response.json();
+    presetSelectEl.innerHTML = manifest
+      .map((p) => `<option value="${escapeHtml(p.file)}">${escapeHtml(p.label)}</option>`)
+      .join('');
+  } catch (err) {
+    console.warn('Could not load presets/manifest.json, no starting points available.', err);
+    presetSelectEl.innerHTML = '';
+  }
+}
+
+loadPresetBtn.addEventListener('click', async () => {
+  const file = presetSelectEl.value;
+  if (!file) {
+    setPresetStatus('No starting points available.', 'error');
+    return;
+  }
+
+  try {
+    const response = await fetch(file);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const config = await response.json();
+    const result = applyConfig(config);
+    if (!result.ok) {
+      setPresetStatus(result.error, 'error');
+      return;
+    }
+    setPresetStatus('Loaded.', 'success');
+    update();
+  } catch (err) {
+    setPresetStatus(`Could not load ${file}: ${err.message}`, 'error');
+  }
+});
 
 loadConfigBtn.addEventListener('click', () => {
   let parsed;
@@ -429,5 +474,5 @@ async function loadDefaults() {
 
 populateTableCatalog();
 resetBufferToDefault();
-await loadDefaults();
+await Promise.all([loadDefaults(), loadPresetManifest()]);
 update();
