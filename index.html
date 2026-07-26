@@ -156,18 +156,23 @@
       white-space: nowrap;
     }
     .obstacle-table td {
-      padding: 0.3rem 0.35rem;
+      padding: 0.3rem 0.25rem;
       border-bottom: 1px solid var(--ts-obstacle-row-border);
       vertical-align: middle;
     }
     .obstacle-table input[type="number"] {
-      width: 4rem;
-      max-width: 4rem;
+      width: 3rem;
+      max-width: 3rem;
       margin-top: 0;
+    }
+    .obstacle-table input[data-field="buffer"],
+    .obstacle-table input[data-field="seats"] {
+      width: 2.1rem;
+      max-width: 2.1rem;
     }
     .obstacle-table input[type="text"] {
       width: 100%;
-      min-width: 6rem;
+      min-width: 4.5rem;
       margin-top: 0;
       padding: 0.4rem;
     }
@@ -281,6 +286,7 @@
                   <th>Depth (ft)</th>
                   <th>Shape</th>
                   <th>Buffer (in)</th>
+                  <th>Seats</th>
                   <th>Label</th>
                   <th></th>
                 </tr>
