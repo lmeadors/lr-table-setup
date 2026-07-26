@@ -35,6 +35,7 @@ let obstacles = [];
 let nextObstacleId = 1;
 let dragState = null;
 let lastStrategy = null;
+let lastResult = null;
 
 function populateTableCatalog() {
   tableSelect.innerHTML = tableCatalog
@@ -99,6 +100,7 @@ function update() {
 
   const result = arrange({ room, tableType, guestCount: remainingGuestCount, mode, packing, buffer, preferredStrategy: lastStrategy });
   lastStrategy = result.strategy;
+  lastResult = result;
   const roomArea = roomAreaSqFt(room);
   const areaUsed = (result.tableCount * (result.footprint.width * result.footprint.depth)) / 144;
 
@@ -383,13 +385,25 @@ diagramEl.addEventListener('click', (event) => {
   const tableEl = event.target.closest('.table');
   if (!tableEl) return;
 
-  const { tableType, buffer } = readArrangeInputs();
+  const { tableType, buffer: rawBuffer } = readArrangeInputs();
   if (!tableType) return;
 
   const xFt = Number(tableEl.dataset.x) / 12;
   const yFt = Number(tableEl.dataset.y) / 12;
-  const tableWFt = (tableType.shape === 'round' ? tableType.dimensions.diameter : tableType.dimensions.width) / 12;
-  const tableDFt = (tableType.shape === 'round' ? tableType.dimensions.diameter : tableType.dimensions.depth) / 12;
+  const tableWIn = tableType.shape === 'round' ? tableType.dimensions.diameter : tableType.dimensions.width;
+  const tableDIn = tableType.shape === 'round' ? tableType.dimensions.diameter : tableType.dimensions.depth;
+  const tableWFt = tableWIn / 12;
+  const tableDFt = tableDIn / 12;
+
+  // A pinned table is a snapshot of an auto-placed one - it should represent
+  // exactly what that table represented a moment ago, not a re-derived
+  // default. In spread mode the buffer actually in effect (result.footprint)
+  // is usually larger than the raw form input, since spread maximizes
+  // spacing beyond the minimum; falling back to the raw input here would
+  // silently shrink the table's real clearance the instant it gets pinned.
+  const buffer = lastResult
+    ? Math.round((lastResult.footprint.width - tableWIn) / 2 * 10) / 10
+    : rawBuffer;
 
   obstacles.push({
     id: nextObstacleId++,
