@@ -1,7 +1,6 @@
 import { tableCatalog } from './catalog.js';
 import { arrange } from './lib/solver.js';
 import { renderDiagram, computeScale } from './lib/render.js';
-import { roomAreaSqFt } from './lib/geometry.js';
 import { themes } from './themes.js';
 
 function applyThemeFromQuery() {
@@ -108,8 +107,6 @@ function update() {
   const result = arrange({ room, tableType, guestCount: remainingGuestCount, mode, packing, buffer, preferredStrategy: lastStrategy, startX, startY });
   lastStrategy = result.strategy;
   lastResult = result;
-  const roomArea = roomAreaSqFt(room);
-  const areaUsed = (result.tableCount * (result.footprint.width * result.footprint.depth)) / 144;
 
   const totalTableCount = result.tableCount + pinnedCount;
   const totalSeatsAchieved = result.seatsAchieved + pinnedSeats;
@@ -130,7 +127,6 @@ function update() {
     ${mode === 'spread' && result.tableCount > 0 ? `<p>Buffer used: ${effectiveBufferIn.toFixed(1)} in${
       effectiveBufferIn > buffer + 0.05 ? ` (spread maximized this beyond the ${buffer} in you set)` : ''
     }</p>` : ''}
-    <p>Room area: ${roomArea.toFixed(0)} sq ft &middot; used: ${areaUsed.toFixed(0)} sq ft &middot; remaining: ${(roomArea - areaUsed).toFixed(0)} sq ft</p>
   `;
 
   renderDiagram(diagramEl, room, tableType, result);
