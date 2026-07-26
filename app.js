@@ -1,7 +1,7 @@
 import { tableCatalog } from './catalog.js';
 import { arrange } from './lib/solver.js';
 import { renderDiagram, computeScale } from './lib/render.js';
-import { roomAreaSqFt, effectiveFootprintForBuffer } from './lib/geometry.js';
+import { roomAreaSqFt } from './lib/geometry.js';
 import { themes } from './themes.js';
 
 function applyThemeFromQuery() {
@@ -122,10 +122,11 @@ function currentConfig() {
     room: {
       width: room.width,
       depth: room.depth,
-      obstacles: room.obstacles.map(({ x, y, width, depth, label, shape, seats, tableWidth, tableDepth }) => ({
+      obstacles: room.obstacles.map(({ x, y, width, depth, label, shape, seats, buffer }) => ({
         x, y, width, depth, label,
         shape: shape === 'round' ? 'round' : 'rect',
-        ...(seats ? { seats, tableWidth, tableDepth } : {}),
+        ...(buffer ? { buffer } : {}),
+        ...(seats ? { seats } : {}),
       })),
     },
     tableTypeId: tableType ? tableType.id : null,
@@ -168,7 +169,7 @@ function applyConfig(config) {
     }
     const shape = o.shape === 'round' ? 'round' : 'rect';
     const hasSeats = typeof o.seats === 'number' && o.seats > 0;
-    const hasTableSize = typeof o.tableWidth === 'number' && typeof o.tableDepth === 'number';
+    const bufferValue = typeof o.buffer === 'number' && o.buffer >= 0 ? o.buffer : 0;
     parsedObstacles.push({
       id: nextObstacleId++,
       x: o.x,
@@ -177,8 +178,8 @@ function applyConfig(config) {
       depth: shape === 'round' ? o.width : o.depth,
       label: typeof o.label === 'string' ? o.label : 'Obstacle',
       shape,
+      ...(bufferValue > 0 ? { buffer: bufferValue } : {}),
       ...(hasSeats ? { seats: o.seats } : {}),
-      ...(hasSeats && hasTableSize ? { tableWidth: o.tableWidth, tableDepth: o.tableDepth } : {}),
     });
   }
 
@@ -255,6 +256,7 @@ function renderObstacleRows() {
           <option value="round"${isRound ? ' selected' : ''}>Round</option>
         </select>
       </td>
+      <td><input type="number" step="1" min="0" value="${o.buffer || 0}" data-field="buffer" /></td>
       <td><input type="text" value="${escapeHtml(o.label)}" data-field="label" /></td>
       <td><button type="button" class="remove-obstacle" data-id="${o.id}">Remove</button></td>
     </tr>
@@ -339,25 +341,21 @@ diagramEl.addEventListener('click', (event) => {
   const { tableType, buffer } = readArrangeInputs();
   if (!tableType) return;
 
-  const footprint = effectiveFootprintForBuffer(tableType, buffer);
   const xFt = Number(tableEl.dataset.x) / 12;
   const yFt = Number(tableEl.dataset.y) / 12;
-  const wFt = footprint.width / 12;
-  const dFt = footprint.depth / 12;
   const tableWFt = (tableType.shape === 'round' ? tableType.dimensions.diameter : tableType.dimensions.width) / 12;
   const tableDFt = (tableType.shape === 'round' ? tableType.dimensions.diameter : tableType.dimensions.depth) / 12;
 
   obstacles.push({
     id: nextObstacleId++,
-    x: round1(Math.max(0, xFt - wFt / 2)),
-    y: round1(Math.max(0, yFt - dFt / 2)),
-    width: round1(wFt),
-    depth: round1(dFt),
+    x: round1(Math.max(0, xFt - tableWFt / 2)),
+    y: round1(Math.max(0, yFt - tableDFt / 2)),
+    width: round1(tableWFt),
+    depth: round1(tableDFt),
     label: `${tableType.label} (pinned)`,
     shape: tableType.shape === 'round' ? 'round' : 'rect',
     seats: tableType.seats,
-    tableWidth: round1(tableWFt),
-    tableDepth: round1(tableDFt),
+    buffer,
   });
   renderObstacleRows();
   update();
