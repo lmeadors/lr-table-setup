@@ -108,11 +108,21 @@ function update() {
   const totalSeatsAchieved = result.seatsAchieved + pinnedSeats;
   const seatsShort = Math.max(0, guestCount - totalSeatsAchieved);
 
+  // In spread mode this is usually larger than the Buffer (in) input above,
+  // since spread maximizes spacing beyond that minimum - the input alone
+  // doesn't tell you the actual gap between tables you'd need to reproduce
+  // in the room.
+  const tableWidthIn = tableType.shape === 'round' ? tableType.dimensions.diameter : tableType.dimensions.width;
+  const effectiveBufferIn = result.tableCount > 0 ? (result.footprint.width - tableWidthIn) / 2 : buffer;
+
   summaryEl.innerHTML = `
     <p>${totalTableCount} &times; ${tableType.label}${pinnedCount > 0 ? ` (${pinnedCount} pinned)` : ''}</p>
     <p>${totalSeatsAchieved} of ${guestCount} guests seated${
       seatsShort > 0 ? ` &mdash; short ${seatsShort}` : ''
     }</p>
+    ${mode === 'spread' && result.tableCount > 0 ? `<p>Buffer used: ${effectiveBufferIn.toFixed(1)} in${
+      effectiveBufferIn > buffer + 0.05 ? ` (spread maximized this beyond the ${buffer} in you set)` : ''
+    }</p>` : ''}
     <p>Room area: ${roomArea.toFixed(0)} sq ft &middot; used: ${areaUsed.toFixed(0)} sq ft &middot; remaining: ${(roomArea - areaUsed).toFixed(0)} sq ft</p>
   `;
 
