@@ -30,6 +30,8 @@ const configStatusEl = document.getElementById('config-status');
 const presetSelectEl = document.getElementById('preset-select');
 const loadPresetBtn = document.getElementById('load-preset');
 const presetStatusEl = document.getElementById('preset-status');
+const startXInput = document.getElementById('start-x');
+const startYInput = document.getElementById('start-y');
 
 let obstacles = [];
 let nextObstacleId = 1;
@@ -58,12 +60,17 @@ function readArrangeInputs() {
     ? bufferValue
     : (tableType ? tableType.clearanceBuffer : 0);
 
+  const startX = Number(startXInput.value) || 0;
+  const startY = Number(startYInput.value) || 0;
+
   return {
     tableType,
     guestCount: Number(document.getElementById('guest-count').value),
     mode: document.querySelector('input[name="mode"]:checked').value,
     packing: packingSelect.value,
     buffer,
+    startX,
+    startY,
   };
 }
 
@@ -84,7 +91,7 @@ function pinnedTableCount() {
 
 function update() {
   const room = readRoom();
-  const { tableType, guestCount, mode, packing, buffer } = readArrangeInputs();
+  const { tableType, guestCount, mode, packing, buffer, startX, startY } = readArrangeInputs();
 
   packingField.hidden = !tableType || tableType.shape !== 'round';
 
@@ -98,7 +105,7 @@ function update() {
   const pinnedCount = pinnedTableCount();
   const remainingGuestCount = Math.max(0, guestCount - pinnedSeats);
 
-  const result = arrange({ room, tableType, guestCount: remainingGuestCount, mode, packing, buffer, preferredStrategy: lastStrategy });
+  const result = arrange({ room, tableType, guestCount: remainingGuestCount, mode, packing, buffer, preferredStrategy: lastStrategy, startX, startY });
   lastStrategy = result.strategy;
   lastResult = result;
   const roomArea = roomAreaSqFt(room);
@@ -132,7 +139,7 @@ function update() {
 
 function currentConfig() {
   const room = readRoom();
-  const { tableType, guestCount, mode, packing, buffer } = readArrangeInputs();
+  const { tableType, guestCount, mode, packing, buffer, startX, startY } = readArrangeInputs();
   return {
     room: {
       width: room.width,
@@ -149,6 +156,8 @@ function currentConfig() {
     mode,
     packing,
     buffer,
+    ...(startX ? { startX } : {}),
+    ...(startY ? { startY } : {}),
   };
 }
 
@@ -212,6 +221,8 @@ function applyConfig(config) {
   const buffer = typeof config.buffer === 'number' && config.buffer >= 0
     ? config.buffer
     : tableType.clearanceBuffer;
+  const startX = typeof config.startX === 'number' && config.startX >= 0 ? config.startX : 0;
+  const startY = typeof config.startY === 'number' && config.startY >= 0 ? config.startY : 0;
 
   document.getElementById('room-width').value = room.width;
   document.getElementById('room-depth').value = room.depth;
@@ -220,6 +231,8 @@ function applyConfig(config) {
   bufferInput.value = buffer;
   document.querySelector(`input[name="mode"][value="${mode}"]`).checked = true;
   packingSelect.value = packing;
+  startXInput.value = startX;
+  startYInput.value = startY;
 
   obstacles = parsedObstacles;
   renderObstacleRows();
@@ -382,10 +395,10 @@ diagramEl.addEventListener('pointermove', (event) => {
   const { xFt, yFt } = pointerToFeet(event, room, scale, containerRect);
   const preview = normalizeDragRect(startXFt, startYFt, xFt, yFt, room);
 
-  const { tableType, guestCount, mode, packing, buffer } = readArrangeInputs();
+  const { tableType, guestCount, mode, packing, buffer, startX, startY } = readArrangeInputs();
   const remainingGuestCount = guestCount ? Math.max(0, guestCount - pinnedSeatsTotal()) : 0;
   const result = tableType && guestCount
-    ? arrange({ room, tableType, guestCount: remainingGuestCount, mode, packing, buffer, preferredStrategy: lastStrategy })
+    ? arrange({ room, tableType, guestCount: remainingGuestCount, mode, packing, buffer, preferredStrategy: lastStrategy, startX, startY })
     : null;
 
   renderDiagram(diagramEl, room, tableType, result, preview);

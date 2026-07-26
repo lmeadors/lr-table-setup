@@ -22,6 +22,10 @@ The values the form loads with (room size, obstacles, table type, guest count, m
 
 The "Starting point" dropdown above the Configuration box lets you jump straight to a saved layout instead of building one from scratch. It's driven by [presets/manifest.json](presets/manifest.json), a list of `{ id, label, file }` entries — `file` is any config JSON (same shape as `defaults.json`), fetched relative to the site root. To add one, drop a new config file anywhere in the repo and add an entry pointing to it; no code changes needed.
 
+## Start X / Start Y
+
+The auto-placement grid normally starts flush against the room's top-left corner (0,0). If an obstacle near that corner only leaves room for a partial row or column before a full one fits, "Start X (ft)" / "Start Y (ft)" shift the grid's origin so it skips that partial row/column instead. There's no auto-detection - try a value, check the row/column layout in the diagram, adjust. Zero (the default) reproduces the original behavior.
+
 ## Embedding and styling
 
 To fit it into another site, see [STYLING.md](STYLING.md) — CSS custom properties for theming, plus iframe and inline embed recipes. Preview built-in themes and copy their CSS at [theme-gallery.html](theme-gallery.html).
