@@ -323,10 +323,7 @@ function renderObstacleRows() {
         </select>
       </td>
       <td><input type="number" step="1" min="0" value="${o.buffer || 0}" data-field="buffer" /></td>
-      <td>${o.seats
-        ? `<input type="number" step="1" min="0" value="${o.seats}" data-field="seats" title="Seats this pinned table actually counts toward the guest total - override if it has fewer/more chairs than the table type's default." />`
-        : `<input type="number" value="" data-field="seats" disabled title="Only pinned tables (created by clicking a table) have a seat count." />`
-      }</td>
+      <td><input type="number" step="1" min="0" value="${o.seats || 0}" data-field="seats" title="Seats this obstacle counts toward the guest total. Above zero, it's treated as a table - counted toward capacity and styled like one in the diagram." /></td>
       <td><input type="text" value="${escapeHtml(o.label)}" data-field="label" /></td>
       <td><button type="button" class="remove-obstacle" data-id="${o.id}">Remove</button></td>
     </tr>
