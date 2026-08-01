@@ -1,0 +1,128 @@
+name: Deploy PR preview
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    types: [opened, synchronize, reopened, closed]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: pages-preview-${{ github.event.pull_request.number || 'main' }}
+  cancel-in-progress: true
+
+jobs:
+  deploy-main:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          path: source
+
+      - name: Checkout or create gh-pages
+        run: |
+          git fetch origin gh-pages || true
+          if git show-ref --verify --quiet refs/remotes/origin/gh-pages; then
+            git worktree add gh-pages-wt gh-pages
+          else
+            git worktree add --orphan gh-pages-wt gh-pages
+          fi
+
+      - name: Sync main's content into gh-pages root (preserve pr-*/ subfolders)
+        run: |
+          find gh-pages-wt -maxdepth 1 -mindepth 1 ! -name 'pr-*' ! -name '.git' -exec rm -rf {} +
+          rsync -a --exclude='.git' source/ gh-pages-wt/
+          touch gh-pages-wt/.nojekyll
+
+      - name: Commit and push
+        working-directory: gh-pages-wt
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "deploy: ${{ github.sha }}" || echo "nothing to commit"
+          git push origin gh-pages
+
+  deploy-preview:
+    if: github.event_name == 'pull_request' && github.event.action != 'closed'
+    runs-on: ubuntu-latest
+    env:
+      PREVIEW_DIR: pr-${{ github.event.pull_request.number }}
+      PREVIEW_URL: https://lmeadors.github.io/lr-table-setup/pr-${{ github.event.pull_request.number }}/
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout PR head
+        uses: actions/checkout@v4
+        with:
+          path: source
+
+      - name: Checkout or create gh-pages
+        run: |
+          git fetch origin gh-pages || true
+          if git show-ref --verify --quiet refs/remotes/origin/gh-pages; then
+            git worktree add gh-pages-wt gh-pages
+          else
+            git worktree add --orphan gh-pages-wt gh-pages
+          fi
+
+      - name: Copy this PR's content into its subfolder
+        run: |
+          rm -rf "gh-pages-wt/${PREVIEW_DIR}"
+          mkdir -p "gh-pages-wt/${PREVIEW_DIR}"
+          rsync -a --exclude='.git' source/ "gh-pages-wt/${PREVIEW_DIR}/"
+          touch gh-pages-wt/.nojekyll
+
+      - name: Commit and push
+        working-directory: gh-pages-wt
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "preview: PR #${{ github.event.pull_request.number }}" || echo "nothing to commit"
+          git push origin gh-pages
+
+      - name: Comment preview link on PR
+        run: |
+          MARKER="<!-- pr-preview-link -->"
+          BODY="${MARKER}
+          🔍 **Preview:** ${PREVIEW_URL}"
+          EXISTING=$(gh api "repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments" \
+            --jq ".[] | select(.body | startswith(\"$MARKER\")) | .id" | head -n1)
+          if [ -n "$EXISTING" ]; then
+            gh api -X PATCH "repos/${{ github.repository }}/issues/comments/$EXISTING" -f body="$BODY"
+          else
+            gh pr comment ${{ github.event.pull_request.number }} --body "$BODY"
+          fi
+
+  remove-preview:
+    if: github.event_name == 'pull_request' && github.event.action == 'closed'
+    runs-on: ubuntu-latest
+    env:
+      PREVIEW_DIR: pr-${{ github.event.pull_request.number }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Remove this PR's preview folder
+        run: |
+          git fetch origin gh-pages
+          git worktree add gh-pages-wt gh-pages
+          rm -rf "gh-pages-wt/${PREVIEW_DIR}"
+          cd gh-pages-wt
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "remove preview for closed PR #${{ github.event.pull_request.number }}" || echo "nothing to commit"
+          git push origin gh-pages
+
+      - name: Remove preview link comment
+        run: |
+          MARKER="<!-- pr-preview-link -->"
+          gh api "repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments" \
+            --jq ".[] | select(.body | startswith(\"$MARKER\")) | .id" | \
+            xargs -r -I{} gh api -X DELETE "repos/${{ github.repository }}/issues/comments/{}"
