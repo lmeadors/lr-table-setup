@@ -245,9 +245,13 @@
             Guest count
             <input type="number" id="guest-count" min="1" step="1" value="120" />
           </label>
-          <label title="Defaults to this table type's catalog clearance. Lower it to pack tables tighter than recommended.">
+          <label id="buffer-label" title="Defaults to this table type's catalog clearance. Lower it to pack tables tighter than recommended.">
             Buffer (in)
             <input type="number" id="buffer-override" min="0" step="1" />
+          </label>
+          <label id="depth-buffer-field" title="Rectangular tables only: no one sits at the short ends, so clearance there (the Width axis, above) can be tighter than clearance along the long seating edges (the Depth axis, here).">
+            Depth buffer (in)
+            <input type="number" id="depth-buffer-override" min="0" step="1" />
           </label>
           <div class="mode-options">
             <label><input type="radio" name="mode" value="compact" checked /> Compact</label>

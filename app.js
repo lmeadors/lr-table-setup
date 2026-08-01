@@ -15,7 +15,10 @@ function applyThemeFromQuery() {
 applyThemeFromQuery();
 
 const tableSelect = document.getElementById('table-type');
+const bufferLabel = document.getElementById('buffer-label');
 const bufferInput = document.getElementById('buffer-override');
+const depthBufferField = document.getElementById('depth-buffer-field');
+const depthBufferInput = document.getElementById('depth-buffer-override');
 const packingField = document.getElementById('packing-field');
 const packingSelect = document.getElementById('packing');
 const form = document.getElementById('arrange-form');
@@ -54,10 +57,7 @@ function readRoom() {
 
 function readArrangeInputs() {
   const tableType = tableCatalog.find((t) => t.id === tableSelect.value);
-  const bufferValue = Number(bufferInput.value);
-  const buffer = Number.isFinite(bufferValue) && bufferValue >= 0
-    ? bufferValue
-    : (tableType ? tableType.clearanceBuffer : 0);
+  const buffer = readBufferInputs(tableType);
 
   const startX = Number(startXInput.value) || 0;
   const startY = Number(startYInput.value) || 0;
@@ -73,11 +73,70 @@ function readArrangeInputs() {
   };
 }
 
+// Round tables have one clearance number. Rectangular tables key clearance
+// by axis (width/depth) since no one sits at the short ends - the Buffer
+// field always drives the Width axis, and the Depth field (hidden for round
+// tables) drives the Depth axis.
+function readBufferInputs(tableType) {
+  if (!tableType) return 0;
+  if (tableType.shape !== 'round') {
+    const widthValue = Number(bufferInput.value);
+    const depthValue = Number(depthBufferInput.value);
+    return {
+      width: Number.isFinite(widthValue) && widthValue >= 0 ? widthValue : tableType.clearanceBuffer.width,
+      depth: Number.isFinite(depthValue) && depthValue >= 0 ? depthValue : tableType.clearanceBuffer.depth,
+    };
+  }
+  const bufferValue = Number(bufferInput.value);
+  return Number.isFinite(bufferValue) && bufferValue >= 0 ? bufferValue : tableType.clearanceBuffer;
+}
+
+// Parses a loaded config's `buffer` field against the table type it's paired
+// with. Accepts a plain number for round tables (unchanged), a { width,
+// depth } object for rect tables, or - for backward compatibility with
+// configs saved before per-axis buffers existed - a plain number for a rect
+// table too, applied to both axes.
+function normalizeBufferConfig(rawBuffer, tableType) {
+  if (tableType.shape === 'round') {
+    return typeof rawBuffer === 'number' && rawBuffer >= 0 ? rawBuffer : tableType.clearanceBuffer;
+  }
+  if (rawBuffer && typeof rawBuffer === 'object') {
+    const width = typeof rawBuffer.width === 'number' && rawBuffer.width >= 0 ? rawBuffer.width : tableType.clearanceBuffer.width;
+    const depth = typeof rawBuffer.depth === 'number' && rawBuffer.depth >= 0 ? rawBuffer.depth : tableType.clearanceBuffer.depth;
+    return { width, depth };
+  }
+  if (typeof rawBuffer === 'number' && rawBuffer >= 0) {
+    return { width: rawBuffer, depth: rawBuffer };
+  }
+  return tableType.clearanceBuffer;
+}
+
 function resetBufferToDefault() {
   const tableType = tableCatalog.find((t) => t.id === tableSelect.value);
-  if (tableType) {
+  if (!tableType) return;
+  if (tableType.shape === 'round') {
     bufferInput.value = tableType.clearanceBuffer;
+  } else {
+    bufferInput.value = tableType.clearanceBuffer.width;
+    depthBufferInput.value = tableType.clearanceBuffer.depth;
   }
+}
+
+function describeEffectiveBuffer(tableType, buffer, result) {
+  if (tableType.shape === 'round') {
+    const requested = buffer;
+    const achieved = (result.footprint.width - tableType.dimensions.diameter) / 2;
+    return `Buffer used: ${achieved.toFixed(1)} in${
+      achieved > requested + 0.05 ? ` (spread maximized this beyond the ${requested} in you set)` : ''
+    }`;
+  }
+
+  const widthAchieved = (result.footprint.width - tableType.dimensions.width) / 2;
+  const depthAchieved = (result.footprint.depth - tableType.dimensions.depth) / 2;
+  const grew = widthAchieved > buffer.width + 0.05 || depthAchieved > buffer.depth + 0.05;
+  return `Buffer used: ${widthAchieved.toFixed(1)} in width, ${depthAchieved.toFixed(1)} in depth${
+    grew ? ` (spread maximized beyond the ${buffer.width}/${buffer.depth} in you set)` : ''
+  }`;
 }
 
 function pinnedSeatsTotal() {
@@ -93,6 +152,8 @@ function update() {
   const { tableType, guestCount, mode, packing, buffer, startX, startY } = readArrangeInputs();
 
   packingField.hidden = !tableType || tableType.shape !== 'round';
+  depthBufferField.hidden = !tableType || tableType.shape === 'round';
+  bufferLabel.childNodes[0].textContent = depthBufferField.hidden ? 'Buffer (in) ' : 'Width buffer (in) ';
 
   if (!tableType || !guestCount || !room.width || !room.depth) {
     summaryEl.innerHTML = '';
@@ -116,17 +177,14 @@ function update() {
   // since spread maximizes spacing beyond that minimum - the input alone
   // doesn't tell you the actual gap between tables you'd need to reproduce
   // in the room.
-  const tableWidthIn = tableType.shape === 'round' ? tableType.dimensions.diameter : tableType.dimensions.width;
-  const effectiveBufferIn = result.tableCount > 0 ? (result.footprint.width - tableWidthIn) / 2 : buffer;
+  const bufferSummary = describeEffectiveBuffer(tableType, buffer, result);
 
   summaryEl.innerHTML = `
     <p>${totalTableCount} &times; ${tableType.label}${pinnedCount > 0 ? ` (${pinnedCount} pinned)` : ''}</p>
     <p>${totalSeatsAchieved} of ${guestCount} guests seated${
       seatsShort > 0 ? ` &mdash; short ${seatsShort}` : ''
     }</p>
-    ${mode === 'spread' && result.tableCount > 0 ? `<p>Buffer used: ${effectiveBufferIn.toFixed(1)} in${
-      effectiveBufferIn > buffer + 0.05 ? ` (spread maximized this beyond the ${buffer} in you set)` : ''
-    }</p>` : ''}
+    ${mode === 'spread' && result.tableCount > 0 ? `<p>${bufferSummary}</p>` : ''}
   `;
 
   renderDiagram(diagramEl, room, tableType, result);
@@ -214,9 +272,7 @@ function applyConfig(config) {
 
   const mode = config.mode === 'spread' ? 'spread' : 'compact';
   const packing = ['square', 'hex'].includes(config.packing) ? config.packing : 'auto';
-  const buffer = typeof config.buffer === 'number' && config.buffer >= 0
-    ? config.buffer
-    : tableType.clearanceBuffer;
+  const buffer = normalizeBufferConfig(config.buffer, tableType);
   const startX = typeof config.startX === 'number' && config.startX >= 0 ? config.startX : 0;
   const startY = typeof config.startY === 'number' && config.startY >= 0 ? config.startY : 0;
 
@@ -224,7 +280,12 @@ function applyConfig(config) {
   document.getElementById('room-depth').value = room.depth;
   document.getElementById('guest-count').value = config.guestCount;
   tableSelect.value = tableType.id;
-  bufferInput.value = buffer;
+  if (tableType.shape === 'round') {
+    bufferInput.value = buffer;
+  } else {
+    bufferInput.value = buffer.width;
+    depthBufferInput.value = buffer.depth;
+  }
   document.querySelector(`input[name="mode"][value="${mode}"]`).checked = true;
   packingSelect.value = packing;
   startXInput.value = startX;
@@ -421,9 +482,16 @@ diagramEl.addEventListener('click', (event) => {
   // is usually larger than the raw form input, since spread maximizes
   // spacing beyond the minimum; falling back to the raw input here would
   // silently shrink the table's real clearance the instant it gets pinned.
+  //
+  // Obstacles only carry one buffer number, applied on all 4 sides - so a
+  // rectangular table (which may have a much smaller Width-axis buffer,
+  // since no one sits at its short ends) has to use its larger Depth-axis
+  // (chair-clearance) buffer here. That slightly over-buffers the ends, but
+  // never under-buffers the seating edges once this becomes a fixed obstacle
+  // other tables have to clear.
   const buffer = lastResult
-    ? Math.round((lastResult.footprint.width - tableWIn) / 2 * 10) / 10
-    : rawBuffer;
+    ? Math.round((lastResult.footprint.depth - tableDIn) / 2 * 10) / 10
+    : (typeof rawBuffer === 'object' ? rawBuffer.depth : rawBuffer);
 
   obstacles.push({
     id: nextObstacleId++,

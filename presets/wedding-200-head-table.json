@@ -98,13 +98,42 @@
         "depth": 2.5,
         "label": "Coats",
         "shape": "rect"
+      },
+      {
+        "x": 6,
+        "y": 4.5,
+        "width": 8,
+        "depth": 2.5,
+        "label": "Head (4)",
+        "shape": "rect",
+        "buffer": 24,
+        "seats": 4
+      },
+      {
+        "x": 14,
+        "y": 4.5,
+        "width": 8,
+        "depth": 2.5,
+        "label": "Head (4)",
+        "shape": "rect",
+        "buffer": 24,
+        "seats": 4
+      },
+      {
+        "x": 22,
+        "y": 4.5,
+        "width": 8,
+        "depth": 2.5,
+        "label": "Head (4)",
+        "shape": "rect",
+        "buffer": 24,
+        "seats": 4
       }
     ]
   },
-  "tableTypeId": "round-60",
-  "guestCount": 152,
-  "mode": "spread",
+  "tableTypeId": "rect-8ft",
+  "guestCount": 200,
+  "mode": "compact",
   "packing": "auto",
-  "buffer": 30,
-  "startY": 3
+  "buffer": { "width": 12, "depth": 24 }
 }
