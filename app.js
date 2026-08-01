@@ -34,6 +34,9 @@ const loadPresetBtn = document.getElementById('load-preset');
 const presetStatusEl = document.getElementById('preset-status');
 const startXInput = document.getElementById('start-x');
 const startYInput = document.getElementById('start-y');
+const shareLinkBtn = document.getElementById('share-link');
+const shareStatusEl = document.getElementById('share-status');
+const shareUrlEl = document.getElementById('share-url');
 
 let obstacles = [];
 let nextObstacleId = 1;
@@ -224,6 +227,71 @@ function setConfigStatus(message, kind) {
   configStatusEl.textContent = message;
   configStatusEl.className = `config-status${kind ? ` ${kind}` : ''}`;
 }
+
+function setShareStatus(message, kind) {
+  shareStatusEl.textContent = message;
+  shareStatusEl.className = `config-status${kind ? ` ${kind}` : ''}`;
+}
+
+// The URL hash (never sent to the server, unlike the query string) carries
+// the whole config as compact JSON, URL-safe-base64-encoded - no backend
+// needed to "host" a shared link. Standard base64's +/ chars are avoided so
+// the link survives being pasted into places that treat + as a space or "/"
+// as a path separator (some chat apps, older link-preview bots).
+function encodeConfigForUrl(config) {
+  const json = JSON.stringify(config);
+  const bytes = new TextEncoder().encode(json);
+  let binary = '';
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+function decodeConfigFromUrl(encoded) {
+  const base64 = encoded.replace(/-/g, '+').replace(/_/g, '/');
+  const padded = base64 + '='.repeat((4 - (base64.length % 4)) % 4);
+  const binary = atob(padded);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return JSON.parse(new TextDecoder().decode(bytes));
+}
+
+// Returns true if a shared config was found (valid or not) - the caller uses
+// that to decide whether to still fall back to defaults.json.
+function loadFromShareLink() {
+  const hash = window.location.hash;
+  if (!hash.startsWith('#c=')) return false;
+
+  try {
+    const config = decodeConfigFromUrl(hash.slice(3));
+    const result = applyConfig(config);
+    if (!result.ok) {
+      console.warn('Shared link config is invalid, falling back to defaults:', result.error);
+      return false;
+    }
+    setConfigStatus('Loaded from shared link.', 'success');
+    return true;
+  } catch (err) {
+    console.warn('Could not decode shared link, falling back to defaults.', err);
+    return false;
+  }
+}
+
+shareLinkBtn.addEventListener('click', async () => {
+  const encoded = encodeConfigForUrl(currentConfig());
+  const url = `${location.origin}${location.pathname}#c=${encoded}`;
+  history.replaceState(null, '', url);
+
+  shareUrlEl.value = url;
+  shareUrlEl.hidden = false;
+  shareUrlEl.select();
+
+  try {
+    await navigator.clipboard.writeText(url);
+    setShareStatus('Link copied to clipboard.', 'success');
+  } catch (err) {
+    setShareStatus('Could not copy automatically - select the link above and copy it.', 'error');
+  }
+});
 
 function applyConfig(config) {
   if (!config || typeof config !== 'object') {
@@ -576,5 +644,6 @@ async function loadDefaults() {
 
 populateTableCatalog();
 resetBufferToDefault();
-await Promise.all([loadDefaults(), loadPresetManifest()]);
+const loadedFromShareLink = loadFromShareLink();
+await Promise.all([loadedFromShareLink ? Promise.resolve() : loadDefaults(), loadPresetManifest()]);
 update();

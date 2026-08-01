@@ -215,6 +215,15 @@
     .config-status.success {
       color: var(--ts-success-color);
     }
+    #share-url {
+      width: 100%;
+      max-width: 100%;
+      box-sizing: border-box;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.8rem;
+      padding: 0.4rem;
+      margin-top: 0.5rem;
+    }
   </style>
 </head>
 <body>
@@ -318,6 +327,11 @@
           <button type="button" id="load-config">Load configuration</button>
           <span id="config-status" class="config-status"></span>
         </div>
+        <div class="config-actions">
+          <button type="button" id="share-link">Copy share link</button>
+          <span id="share-status" class="config-status"></span>
+        </div>
+        <input type="text" id="share-url" readonly hidden />
       </fieldset>
     </div>
 
