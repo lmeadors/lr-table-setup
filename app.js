@@ -1,0 +1,673 @@
+import { tableCatalog } from './catalog.js';
+import { arrange } from './lib/solver.js';
+import { renderDiagram, computeScale } from './lib/render.js';
+import { themes } from './themes.js';
+
+function applyThemeFromQuery() {
+  const themeId = new URLSearchParams(window.location.search).get('theme');
+  const theme = themes[themeId];
+  if (!theme) return;
+  for (const [name, value] of Object.entries(theme.vars)) {
+    document.documentElement.style.setProperty(name, value);
+  }
+}
+
+applyThemeFromQuery();
+
+const tableSelect = document.getElementById('table-type');
+const bufferLabel = document.getElementById('buffer-label');
+const bufferInput = document.getElementById('buffer-override');
+const depthBufferField = document.getElementById('depth-buffer-field');
+const depthBufferInput = document.getElementById('depth-buffer-override');
+const packingField = document.getElementById('packing-field');
+const packingSelect = document.getElementById('packing');
+const form = document.getElementById('arrange-form');
+const summaryEl = document.getElementById('summary');
+const diagramEl = document.getElementById('diagram');
+const obstacleRowsEl = document.getElementById('obstacle-rows');
+const addObstacleBtn = document.getElementById('add-obstacle');
+const configJsonEl = document.getElementById('config-json');
+const loadConfigBtn = document.getElementById('load-config');
+const configStatusEl = document.getElementById('config-status');
+const presetSelectEl = document.getElementById('preset-select');
+const loadPresetBtn = document.getElementById('load-preset');
+const presetStatusEl = document.getElementById('preset-status');
+const startXInput = document.getElementById('start-x');
+const startYInput = document.getElementById('start-y');
+const shareLinkBtn = document.getElementById('share-link');
+const shareStatusEl = document.getElementById('share-status');
+const shareUrlEl = document.getElementById('share-url');
+
+let obstacles = [];
+let nextObstacleId = 1;
+let dragState = null;
+let lastStrategy = null;
+let lastResult = null;
+
+function populateTableCatalog() {
+  tableSelect.innerHTML = tableCatalog
+    .map((t) => `<option value="${t.id}">${t.label}</option>`)
+    .join('');
+}
+
+function readRoom() {
+  return {
+    width: Number(document.getElementById('room-width').value),
+    depth: Number(document.getElementById('room-depth').value),
+    obstacles,
+  };
+}
+
+function readArrangeInputs() {
+  const tableType = tableCatalog.find((t) => t.id === tableSelect.value);
+  const buffer = readBufferInputs(tableType);
+
+  const startX = Number(startXInput.value) || 0;
+  const startY = Number(startYInput.value) || 0;
+
+  return {
+    tableType,
+    guestCount: Number(document.getElementById('guest-count').value),
+    mode: document.querySelector('input[name="mode"]:checked').value,
+    packing: packingSelect.value,
+    buffer,
+    startX,
+    startY,
+  };
+}
+
+// Round tables have one clearance number. Rectangular tables key clearance
+// by axis (width/depth) since no one sits at the short ends - the Buffer
+// field always drives the Width axis, and the Depth field (hidden for round
+// tables) drives the Depth axis.
+function readBufferInputs(tableType) {
+  if (!tableType) return 0;
+  if (tableType.shape !== 'round') {
+    const widthValue = Number(bufferInput.value);
+    const depthValue = Number(depthBufferInput.value);
+    return {
+      width: Number.isFinite(widthValue) && widthValue >= 0 ? widthValue : tableType.clearanceBuffer.width,
+      depth: Number.isFinite(depthValue) && depthValue >= 0 ? depthValue : tableType.clearanceBuffer.depth,
+    };
+  }
+  const bufferValue = Number(bufferInput.value);
+  return Number.isFinite(bufferValue) && bufferValue >= 0 ? bufferValue : tableType.clearanceBuffer;
+}
+
+// Parses a loaded config's `buffer` field against the table type it's paired
+// with. Accepts a plain number for round tables (unchanged), a { width,
+// depth } object for rect tables, or - for backward compatibility with
+// configs saved before per-axis buffers existed - a plain number for a rect
+// table too, applied to both axes.
+function normalizeBufferConfig(rawBuffer, tableType) {
+  if (tableType.shape === 'round') {
+    return typeof rawBuffer === 'number' && rawBuffer >= 0 ? rawBuffer : tableType.clearanceBuffer;
+  }
+  if (rawBuffer && typeof rawBuffer === 'object') {
+    const width = typeof rawBuffer.width === 'number' && rawBuffer.width >= 0 ? rawBuffer.width : tableType.clearanceBuffer.width;
+    const depth = typeof rawBuffer.depth === 'number' && rawBuffer.depth >= 0 ? rawBuffer.depth : tableType.clearanceBuffer.depth;
+    return { width, depth };
+  }
+  if (typeof rawBuffer === 'number' && rawBuffer >= 0) {
+    return { width: rawBuffer, depth: rawBuffer };
+  }
+  return tableType.clearanceBuffer;
+}
+
+function resetBufferToDefault() {
+  const tableType = tableCatalog.find((t) => t.id === tableSelect.value);
+  if (!tableType) return;
+  if (tableType.shape === 'round') {
+    bufferInput.value = tableType.clearanceBuffer;
+  } else {
+    bufferInput.value = tableType.clearanceBuffer.width;
+    depthBufferInput.value = tableType.clearanceBuffer.depth;
+  }
+}
+
+function describeEffectiveBuffer(tableType, buffer, result) {
+  if (tableType.shape === 'round') {
+    const requested = buffer;
+    const achieved = (result.footprint.width - tableType.dimensions.diameter) / 2;
+    return `Buffer used: ${achieved.toFixed(1)} in${
+      achieved > requested + 0.05 ? ` (spread maximized this beyond the ${requested} in you set)` : ''
+    }`;
+  }
+
+  const widthAchieved = (result.footprint.width - tableType.dimensions.width) / 2;
+  const depthAchieved = (result.footprint.depth - tableType.dimensions.depth) / 2;
+  const grew = widthAchieved > buffer.width + 0.05 || depthAchieved > buffer.depth + 0.05;
+  return `Buffer used: ${widthAchieved.toFixed(1)} in width, ${depthAchieved.toFixed(1)} in depth${
+    grew ? ` (spread maximized beyond the ${buffer.width}/${buffer.depth} in you set)` : ''
+  }`;
+}
+
+function pinnedSeatsTotal() {
+  return obstacles.reduce((sum, o) => sum + (o.seats || 0), 0);
+}
+
+function pinnedTableCount() {
+  return obstacles.filter((o) => o.seats).length;
+}
+
+function update() {
+  const room = readRoom();
+  const { tableType, guestCount, mode, packing, buffer, startX, startY } = readArrangeInputs();
+
+  packingField.hidden = !tableType || tableType.shape !== 'round';
+  depthBufferField.hidden = !tableType || tableType.shape === 'round';
+  bufferLabel.childNodes[0].textContent = depthBufferField.hidden ? 'Buffer (in) ' : 'Width buffer (in) ';
+
+  if (!tableType || !guestCount || !room.width || !room.depth) {
+    summaryEl.innerHTML = '';
+    renderDiagram(diagramEl, room, tableType, null);
+    return;
+  }
+
+  const pinnedSeats = pinnedSeatsTotal();
+  const pinnedCount = pinnedTableCount();
+  const remainingGuestCount = Math.max(0, guestCount - pinnedSeats);
+
+  const result = arrange({ room, tableType, guestCount: remainingGuestCount, mode, packing, buffer, preferredStrategy: lastStrategy, startX, startY });
+  lastStrategy = result.strategy;
+  lastResult = result;
+
+  const totalTableCount = result.tableCount + pinnedCount;
+  const totalSeatsAchieved = result.seatsAchieved + pinnedSeats;
+  const seatsShort = Math.max(0, guestCount - totalSeatsAchieved);
+
+  // In spread mode this is usually larger than the Buffer (in) input above,
+  // since spread maximizes spacing beyond that minimum - the input alone
+  // doesn't tell you the actual gap between tables you'd need to reproduce
+  // in the room.
+  const bufferSummary = describeEffectiveBuffer(tableType, buffer, result);
+
+  summaryEl.innerHTML = `
+    <p>${totalTableCount} &times; ${tableType.label}${pinnedCount > 0 ? ` (${pinnedCount} pinned)` : ''}</p>
+    <p>${totalSeatsAchieved} of ${guestCount} guests seated${
+      seatsShort > 0 ? ` &mdash; short ${seatsShort}` : ''
+    }</p>
+    ${mode === 'spread' && result.tableCount > 0 ? `<p>${bufferSummary}</p>` : ''}
+  `;
+
+  renderDiagram(diagramEl, room, tableType, result);
+  syncConfigJson();
+}
+
+function currentConfig() {
+  const room = readRoom();
+  const { tableType, guestCount, mode, packing, buffer, startX, startY } = readArrangeInputs();
+  return {
+    room: {
+      width: room.width,
+      depth: room.depth,
+      obstacles: room.obstacles.map(({ x, y, width, depth, label, shape, seats, buffer }) => ({
+        x, y, width, depth, label,
+        shape: shape === 'round' ? 'round' : 'rect',
+        ...(buffer ? { buffer } : {}),
+        ...(seats ? { seats } : {}),
+      })),
+    },
+    tableTypeId: tableType ? tableType.id : null,
+    guestCount,
+    mode,
+    packing,
+    buffer,
+    ...(startX ? { startX } : {}),
+    ...(startY ? { startY } : {}),
+  };
+}
+
+function syncConfigJson() {
+  if (document.activeElement === configJsonEl) return;
+  configJsonEl.value = JSON.stringify(currentConfig(), null, 2);
+}
+
+function setConfigStatus(message, kind) {
+  configStatusEl.textContent = message;
+  configStatusEl.className = `config-status${kind ? ` ${kind}` : ''}`;
+}
+
+function setShareStatus(message, kind) {
+  shareStatusEl.textContent = message;
+  shareStatusEl.className = `config-status${kind ? ` ${kind}` : ''}`;
+}
+
+// The URL hash (never sent to the server, unlike the query string) carries
+// the whole config - no backend needed to "host" a shared link. gzipped via
+// the browser's native CompressionStream (no dependency; Chrome/Firefox/
+// Safari have all shipped it since 2023) before base64-encoding, since the
+// raw JSON alone produced links long enough that iMessage's link-detection
+// mangled them - gzip cuts a typical multi-obstacle room's link by ~70%.
+// Standard base64's +/ chars are swapped for URL-safe -/_ so the link
+// survives being pasted into places that treat + as a space or "/" as a
+// path separator. #z= is the gzipped format; #c= (uncompressed) is kept as
+// a decode-only fallback for a browser without CompressionStream and for
+// any links already shared under the old format.
+function bytesToUrlSafeBase64(bytes) {
+  let binary = '';
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+function urlSafeBase64ToBytes(encoded) {
+  const base64 = encoded.replace(/-/g, '+').replace(/_/g, '/');
+  const padded = base64 + '='.repeat((4 - (base64.length % 4)) % 4);
+  const binary = atob(padded);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+}
+
+async function gzipText(text) {
+  const stream = new Blob([text]).stream().pipeThrough(new CompressionStream('gzip'));
+  return new Uint8Array(await new Response(stream).arrayBuffer());
+}
+
+async function gunzipBytes(bytes) {
+  const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
+  return new TextDecoder().decode(await new Response(stream).arrayBuffer());
+}
+
+async function buildShareUrl(config) {
+  const json = JSON.stringify(config);
+  const base = `${location.origin}${location.pathname}`;
+  if (typeof CompressionStream === 'undefined') {
+    return `${base}#c=${bytesToUrlSafeBase64(new TextEncoder().encode(json))}`;
+  }
+  return `${base}#z=${bytesToUrlSafeBase64(await gzipText(json))}`;
+}
+
+// Returns true if a shared config was found (valid or not) - the caller uses
+// that to decide whether to still fall back to defaults.json.
+async function loadFromShareLink() {
+  const hash = window.location.hash;
+  const isGzipped = hash.startsWith('#z=');
+  if (!isGzipped && !hash.startsWith('#c=')) return false;
+
+  try {
+    const bytes = urlSafeBase64ToBytes(hash.slice(3));
+    const json = isGzipped ? await gunzipBytes(bytes) : new TextDecoder().decode(bytes);
+    const result = applyConfig(JSON.parse(json));
+    if (!result.ok) {
+      console.warn('Shared link config is invalid, falling back to defaults:', result.error);
+      return false;
+    }
+    setConfigStatus('Loaded from shared link.', 'success');
+    return true;
+  } catch (err) {
+    console.warn('Could not decode shared link, falling back to defaults.', err);
+    return false;
+  }
+}
+
+shareLinkBtn.addEventListener('click', async () => {
+  const url = await buildShareUrl(currentConfig());
+  history.replaceState(null, '', url);
+
+  shareUrlEl.value = url;
+  shareUrlEl.hidden = false;
+  shareUrlEl.select();
+
+  try {
+    await navigator.clipboard.writeText(url);
+    setShareStatus('Link copied to clipboard.', 'success');
+  } catch (err) {
+    setShareStatus('Could not copy automatically - select the link above and copy it.', 'error');
+  }
+});
+
+function applyConfig(config) {
+  if (!config || typeof config !== 'object') {
+    return { ok: false, error: 'Config must be a JSON object.' };
+  }
+
+  const room = config.room;
+  if (!room || typeof room.width !== 'number' || typeof room.depth !== 'number' || room.width <= 0 || room.depth <= 0) {
+    return { ok: false, error: 'room.width and room.depth must be positive numbers.' };
+  }
+
+  const rawObstacles = Array.isArray(room.obstacles) ? room.obstacles : [];
+  const parsedObstacles = [];
+  for (const o of rawObstacles) {
+    if (
+      !o || typeof o !== 'object' ||
+      typeof o.x !== 'number' || typeof o.y !== 'number' ||
+      typeof o.width !== 'number' || typeof o.depth !== 'number'
+    ) {
+      return { ok: false, error: 'Each obstacle needs numeric x, y, width, depth.' };
+    }
+    const shape = o.shape === 'round' ? 'round' : 'rect';
+    const hasSeats = typeof o.seats === 'number' && o.seats > 0;
+    const bufferValue = typeof o.buffer === 'number' && o.buffer >= 0 ? o.buffer : 0;
+    parsedObstacles.push({
+      id: nextObstacleId++,
+      x: o.x,
+      y: o.y,
+      width: o.width,
+      depth: shape === 'round' ? o.width : o.depth,
+      label: typeof o.label === 'string' ? o.label : 'Obstacle',
+      shape,
+      ...(bufferValue > 0 ? { buffer: bufferValue } : {}),
+      ...(hasSeats ? { seats: o.seats } : {}),
+    });
+  }
+
+  const tableType = tableCatalog.find((t) => t.id === config.tableTypeId);
+  if (!tableType) {
+    return { ok: false, error: `Unknown tableTypeId: ${JSON.stringify(config.tableTypeId)}` };
+  }
+
+  if (typeof config.guestCount !== 'number' || config.guestCount <= 0) {
+    return { ok: false, error: 'guestCount must be a positive number.' };
+  }
+
+  const mode = config.mode === 'spread' ? 'spread' : 'compact';
+  const packing = ['square', 'hex'].includes(config.packing) ? config.packing : 'auto';
+  const buffer = normalizeBufferConfig(config.buffer, tableType);
+  const startX = typeof config.startX === 'number' && config.startX >= 0 ? config.startX : 0;
+  const startY = typeof config.startY === 'number' && config.startY >= 0 ? config.startY : 0;
+
+  document.getElementById('room-width').value = room.width;
+  document.getElementById('room-depth').value = room.depth;
+  document.getElementById('guest-count').value = config.guestCount;
+  tableSelect.value = tableType.id;
+  if (tableType.shape === 'round') {
+    bufferInput.value = buffer;
+  } else {
+    bufferInput.value = buffer.width;
+    depthBufferInput.value = buffer.depth;
+  }
+  document.querySelector(`input[name="mode"][value="${mode}"]`).checked = true;
+  packingSelect.value = packing;
+  startXInput.value = startX;
+  startYInput.value = startY;
+
+  obstacles = parsedObstacles;
+  renderObstacleRows();
+
+  return { ok: true };
+}
+
+function setPresetStatus(message, kind) {
+  presetStatusEl.textContent = message;
+  presetStatusEl.className = `config-status${kind ? ` ${kind}` : ''}`;
+}
+
+async function loadPresetManifest() {
+  try {
+    const response = await fetch('presets/manifest.json');
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const manifest = await response.json();
+    presetSelectEl.innerHTML = manifest
+      .map((p) => `<option value="${escapeHtml(p.file)}">${escapeHtml(p.label)}</option>`)
+      .join('');
+  } catch (err) {
+    console.warn('Could not load presets/manifest.json, no starting points available.', err);
+    presetSelectEl.innerHTML = '';
+  }
+}
+
+loadPresetBtn.addEventListener('click', async () => {
+  const file = presetSelectEl.value;
+  if (!file) {
+    setPresetStatus('No starting points available.', 'error');
+    return;
+  }
+
+  try {
+    const response = await fetch(file);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const config = await response.json();
+    const result = applyConfig(config);
+    if (!result.ok) {
+      setPresetStatus(result.error, 'error');
+      return;
+    }
+    setPresetStatus('Loaded.', 'success');
+    update();
+  } catch (err) {
+    setPresetStatus(`Could not load ${file}: ${err.message}`, 'error');
+  }
+});
+
+loadConfigBtn.addEventListener('click', () => {
+  let parsed;
+  try {
+    parsed = JSON.parse(configJsonEl.value);
+  } catch (err) {
+    setConfigStatus(`Invalid JSON: ${err.message}`, 'error');
+    return;
+  }
+
+  const result = applyConfig(parsed);
+  if (!result.ok) {
+    setConfigStatus(result.error, 'error');
+    return;
+  }
+
+  setConfigStatus('Loaded.', 'success');
+  update();
+});
+
+function escapeHtml(value) {
+  return String(value).replace(/[&<>"']/g, (c) => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+  }[c]));
+}
+
+function renderObstacleRows() {
+  obstacleRowsEl.innerHTML = obstacles.map((o) => {
+    const isRound = o.shape === 'round';
+    return `
+    <tr data-id="${o.id}">
+      <td><input type="number" step="0.5" min="0" value="${o.x}" data-field="x" /></td>
+      <td><input type="number" step="0.5" min="0" value="${o.y}" data-field="y" /></td>
+      <td><input type="number" step="0.5" min="0.5" value="${o.width}" data-field="width" /></td>
+      <td><input type="number" step="0.5" min="0.5" value="${o.depth}" data-field="depth" ${isRound ? 'disabled title="A round obstacle\'s depth always matches its width (diameter)."' : ''} /></td>
+      <td>
+        <select data-field="shape">
+          <option value="rect"${isRound ? '' : ' selected'}>Rectangle</option>
+          <option value="round"${isRound ? ' selected' : ''}>Round</option>
+        </select>
+      </td>
+      <td><input type="number" step="1" min="0" value="${o.buffer || 0}" data-field="buffer" /></td>
+      <td><input type="number" step="1" min="0" value="${o.seats || 0}" data-field="seats" title="Seats this obstacle counts toward the guest total. Above zero, it's treated as a table - counted toward capacity and styled like one in the diagram." /></td>
+      <td><input type="text" value="${escapeHtml(o.label)}" data-field="label" /></td>
+      <td><button type="button" class="remove-obstacle" data-id="${o.id}">Remove</button></td>
+    </tr>
+  `;
+  }).join('');
+}
+
+function addObstacle(partial) {
+  obstacles.push({
+    id: nextObstacleId++,
+    x: 0,
+    y: 0,
+    width: 5,
+    depth: 5,
+    label: 'Obstacle',
+    shape: 'rect',
+    ...partial,
+  });
+  renderObstacleRows();
+}
+
+function round1(n) {
+  return Math.round(n * 10) / 10;
+}
+
+function normalizeDragRect(x0, y0, x1, y1, room) {
+  const left = Math.max(0, Math.min(x0, x1));
+  const top = Math.max(0, Math.min(y0, y1));
+  const right = Math.min(room.width, Math.max(x0, x1));
+  const bottom = Math.min(room.depth, Math.max(y0, y1));
+  return {
+    x: round1(left),
+    y: round1(top),
+    width: round1(Math.max(0, right - left)),
+    depth: round1(Math.max(0, bottom - top)),
+  };
+}
+
+function pointerToFeet(event, room, scale, containerRect) {
+  return {
+    xFt: (event.clientX - containerRect.left) / scale / 12,
+    yFt: (event.clientY - containerRect.top) / scale / 12,
+  };
+}
+
+diagramEl.addEventListener('pointerdown', (event) => {
+  if (event.target.closest('.table')) return;
+
+  const room = readRoom();
+  if (!room.width || !room.depth) return;
+
+  const svg = diagramEl.querySelector('svg');
+  if (!svg) return;
+
+  const containerRect = svg.getBoundingClientRect();
+  const scale = computeScale(room);
+  const { xFt, yFt } = pointerToFeet(event, room, scale, containerRect);
+
+  dragState = { room, scale, containerRect, startXFt: xFt, startYFt: yFt };
+  diagramEl.setPointerCapture(event.pointerId);
+});
+
+diagramEl.addEventListener('pointermove', (event) => {
+  if (!dragState) return;
+  const { room, scale, containerRect, startXFt, startYFt } = dragState;
+  const { xFt, yFt } = pointerToFeet(event, room, scale, containerRect);
+  const preview = normalizeDragRect(startXFt, startYFt, xFt, yFt, room);
+
+  const { tableType, guestCount, mode, packing, buffer, startX, startY } = readArrangeInputs();
+  const remainingGuestCount = guestCount ? Math.max(0, guestCount - pinnedSeatsTotal()) : 0;
+  const result = tableType && guestCount
+    ? arrange({ room, tableType, guestCount: remainingGuestCount, mode, packing, buffer, preferredStrategy: lastStrategy, startX, startY })
+    : null;
+
+  renderDiagram(diagramEl, room, tableType, result, preview);
+});
+
+diagramEl.addEventListener('click', (event) => {
+  const tableEl = event.target.closest('.table');
+  if (!tableEl) return;
+
+  const { tableType, buffer: rawBuffer } = readArrangeInputs();
+  if (!tableType) return;
+
+  const xFt = Number(tableEl.dataset.x) / 12;
+  const yFt = Number(tableEl.dataset.y) / 12;
+  const tableWIn = tableType.shape === 'round' ? tableType.dimensions.diameter : tableType.dimensions.width;
+  const tableDIn = tableType.shape === 'round' ? tableType.dimensions.diameter : tableType.dimensions.depth;
+  const tableWFt = tableWIn / 12;
+  const tableDFt = tableDIn / 12;
+
+  // A pinned table is a snapshot of an auto-placed one - it should represent
+  // exactly what that table represented a moment ago, not a re-derived
+  // default. In spread mode the buffer actually in effect (result.footprint)
+  // is usually larger than the raw form input, since spread maximizes
+  // spacing beyond the minimum; falling back to the raw input here would
+  // silently shrink the table's real clearance the instant it gets pinned.
+  //
+  // Obstacles only carry one buffer number, applied on all 4 sides - so a
+  // rectangular table (which may have a much smaller Width-axis buffer,
+  // since no one sits at its short ends) has to use its larger Depth-axis
+  // (chair-clearance) buffer here. That slightly over-buffers the ends, but
+  // never under-buffers the seating edges once this becomes a fixed obstacle
+  // other tables have to clear.
+  const buffer = lastResult
+    ? Math.round((lastResult.footprint.depth - tableDIn) / 2 * 10) / 10
+    : (typeof rawBuffer === 'object' ? rawBuffer.depth : rawBuffer);
+
+  obstacles.push({
+    id: nextObstacleId++,
+    x: round1(Math.max(0, xFt - tableWFt / 2)),
+    y: round1(Math.max(0, yFt - tableDFt / 2)),
+    width: round1(tableWFt),
+    depth: round1(tableDFt),
+    label: `${tableType.label} (pinned)`,
+    shape: tableType.shape === 'round' ? 'round' : 'rect',
+    seats: tableType.seats,
+    buffer,
+  });
+  renderObstacleRows();
+  update();
+});
+
+diagramEl.addEventListener('pointerup', (event) => {
+  if (!dragState) return;
+  const { room, scale, containerRect, startXFt, startYFt } = dragState;
+  const { xFt, yFt } = pointerToFeet(event, room, scale, containerRect);
+  const rect = normalizeDragRect(startXFt, startYFt, xFt, yFt, room);
+  dragState = null;
+
+  if (rect.width >= 0.5 && rect.depth >= 0.5) {
+    addObstacle(rect);
+  }
+  update();
+});
+
+obstacleRowsEl.addEventListener('input', (event) => {
+  const row = event.target.closest('tr');
+  if (!row) return;
+  const obstacle = obstacles.find((o) => o.id === Number(row.dataset.id));
+  if (!obstacle) return;
+
+  const field = event.target.dataset.field;
+  obstacle[field] = (field === 'label' || field === 'shape') ? event.target.value : Number(event.target.value);
+
+  if (field === 'shape' || (field === 'width' && obstacle.shape === 'round')) {
+    obstacle.depth = obstacle.width;
+  }
+
+  if (field === 'shape') {
+    renderObstacleRows();
+  }
+
+  update();
+});
+
+obstacleRowsEl.addEventListener('click', (event) => {
+  if (!event.target.classList.contains('remove-obstacle')) return;
+  obstacles = obstacles.filter((o) => o.id !== Number(event.target.dataset.id));
+  renderObstacleRows();
+  update();
+});
+
+addObstacleBtn.addEventListener('click', () => {
+  addObstacle({});
+  update();
+});
+
+tableSelect.addEventListener('change', () => {
+  resetBufferToDefault();
+  update();
+});
+
+form.addEventListener('input', update);
+
+async function loadDefaults() {
+  try {
+    const response = await fetch('defaults.json');
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const defaults = await response.json();
+    const result = applyConfig(defaults);
+    if (!result.ok) {
+      console.warn('defaults.json is invalid, falling back to built-in form defaults:', result.error);
+    }
+  } catch (err) {
+    console.warn('Could not load defaults.json, falling back to built-in form defaults.', err);
+  }
+}
+
+populateTableCatalog();
+resetBufferToDefault();
+const loadedFromShareLink = await loadFromShareLink();
+await Promise.all([loadedFromShareLink ? Promise.resolve() : loadDefaults(), loadPresetManifest()]);
+update();

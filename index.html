@@ -1,0 +1,347 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Table Setup</title>
+  <style>
+    :root {
+      --ts-font-family: system-ui, sans-serif;
+      --ts-body-bg: transparent;
+      --ts-text-color: #1a1a1a;
+      --ts-hint-color: #555;
+      --ts-border-color: #ccc;
+      --ts-success-color: #2f7a3f;
+      --ts-error-color: #a13d3d;
+
+      --ts-room-fill: #f5f5f5;
+      --ts-room-stroke: #333;
+      --ts-diagram-border: #ddd;
+
+      --ts-table-fill: #7aa6c2;
+      --ts-table-stroke: #2c4a5e;
+      --ts-table-hover-fill: #5c8aa8;
+      --ts-table-shadow-color: #2c4a5e;
+
+      --ts-obstacle-fill: #d98c8c;
+      --ts-obstacle-stroke: #a13d3d;
+      --ts-obstacle-label-color: #6b2323;
+      --ts-obstacle-row-border: #eee;
+    }
+    body {
+      font-family: var(--ts-font-family);
+      max-width: 1500px;
+      margin: 2rem auto;
+      padding: 0 1rem;
+      color: var(--ts-text-color);
+      background-color: var(--ts-body-bg);
+    }
+    .page-layout {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-start;
+      gap: 1.5rem;
+    }
+    .controls-column {
+      flex: 1 1 500px;
+      min-width: 0;
+    }
+    .preview-column {
+      flex: 0 1 720px;
+      position: sticky;
+      top: 1rem;
+    }
+    .form-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+    .form-row fieldset {
+      flex: 1 1 320px;
+    }
+    fieldset {
+      border: 1px solid var(--ts-border-color);
+      border-radius: 6px;
+      margin-bottom: 1rem;
+      padding: 1rem;
+      min-width: 0;
+    }
+    [hidden] {
+      display: none !important;
+    }
+    label {
+      display: block;
+      margin-bottom: 0.75rem;
+    }
+    input[type="number"], select {
+      display: block;
+      width: 100%;
+      max-width: 200px;
+      padding: 0.4rem;
+      margin-top: 0.25rem;
+    }
+    .mode-options {
+      display: flex;
+      gap: 1.5rem;
+    }
+    .mode-options label {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+    #summary p {
+      margin: 0.25rem 0;
+      font-size: 1.1rem;
+    }
+    .room-outline {
+      fill: var(--ts-room-fill);
+      stroke: var(--ts-room-stroke);
+      stroke-width: 2;
+    }
+    .table {
+      fill: var(--ts-table-fill);
+      stroke: var(--ts-table-stroke);
+      stroke-width: 1;
+      cursor: pointer;
+    }
+    .table-shadow {
+      fill: var(--ts-table-shadow-color);
+      opacity: 0.3;
+      pointer-events: none;
+    }
+    .table:hover {
+      fill: var(--ts-table-hover-fill);
+    }
+    .obstacle {
+      fill: var(--ts-obstacle-fill);
+      fill-opacity: 0.55;
+      stroke: var(--ts-obstacle-stroke);
+      stroke-width: 1.5;
+    }
+    .obstacle-preview {
+      fill-opacity: 0.3;
+      stroke-dasharray: 5 3;
+    }
+    .obstacle-pinned-table {
+      fill: var(--ts-table-fill);
+      stroke: var(--ts-table-stroke);
+      stroke-width: 1;
+      stroke-dasharray: 4 2;
+    }
+    .obstacle-label {
+      font-size: 11px;
+      fill: var(--ts-obstacle-label-color);
+      pointer-events: none;
+    }
+    #diagram {
+      margin-top: 1rem;
+      border: 1px solid var(--ts-diagram-border);
+      display: inline-block;
+      touch-action: none;
+      cursor: crosshair;
+    }
+.obstacle-table-wrap {
+      overflow-x: auto;
+      margin-bottom: 0.75rem;
+    }
+    .obstacle-table {
+      border-collapse: collapse;
+      width: 100%;
+    }
+    .obstacle-table th {
+      text-align: left;
+      font-size: 0.8rem;
+      font-weight: 600;
+      padding: 0.3rem 0.5rem;
+      border-bottom: 2px solid var(--ts-obstacle-row-border);
+      white-space: nowrap;
+    }
+    .obstacle-table td {
+      padding: 0.3rem 0.25rem;
+      border-bottom: 1px solid var(--ts-obstacle-row-border);
+      vertical-align: middle;
+    }
+    .obstacle-table input[type="number"] {
+      width: 3rem;
+      max-width: 3rem;
+      margin-top: 0;
+    }
+    .obstacle-table input[data-field="buffer"],
+    .obstacle-table input[data-field="seats"] {
+      width: 2.1rem;
+      max-width: 2.1rem;
+    }
+    .obstacle-table input[type="text"] {
+      width: 100%;
+      min-width: 4.5rem;
+      margin-top: 0;
+      padding: 0.4rem;
+    }
+    .obstacle-table select {
+      margin-top: 0;
+      width: 6rem;
+    }
+    .remove-obstacle {
+      height: 2.1rem;
+      padding: 0 0.6rem;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .hint {
+      font-size: 0.9rem;
+      color: var(--ts-hint-color);
+      margin: 0.25rem 0 0.75rem;
+    }
+    #config-json {
+      width: 100%;
+      max-width: 100%;
+      box-sizing: border-box;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.85rem;
+      padding: 0.5rem;
+      resize: vertical;
+    }
+    .config-actions {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-top: 0.5rem;
+    }
+    .config-status {
+      font-size: 0.85rem;
+    }
+    .config-status.error {
+      color: var(--ts-error-color);
+    }
+    .config-status.success {
+      color: var(--ts-success-color);
+    }
+    #share-url {
+      width: 100%;
+      max-width: 100%;
+      box-sizing: border-box;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.8rem;
+      padding: 0.4rem;
+      margin-top: 0.5rem;
+    }
+  </style>
+</head>
+<body>
+  <h1>Table Setup</h1>
+  <div class="page-layout">
+    <div class="controls-column">
+      <form id="arrange-form">
+        <div class="form-row">
+        <fieldset>
+          <legend>Room</legend>
+          <label>
+            Width (ft)
+            <input type="number" id="room-width" min="1" step="1" value="40" />
+          </label>
+          <label>
+            Depth (ft)
+            <input type="number" id="room-depth" min="1" step="1" value="60" />
+          </label>
+        </fieldset>
+
+        <fieldset>
+          <legend>Tables</legend>
+          <label>
+            Table type
+            <select id="table-type"></select>
+          </label>
+          <label>
+            Guest count
+            <input type="number" id="guest-count" min="1" step="1" value="120" />
+          </label>
+          <label id="buffer-label" title="Defaults to this table type's catalog clearance. Lower it to pack tables tighter than recommended.">
+            Buffer (in)
+            <input type="number" id="buffer-override" min="0" step="1" />
+          </label>
+          <label id="depth-buffer-field" title="Rectangular tables only: no one sits at the short ends, so clearance there (the Width axis, above) can be tighter than clearance along the long seating edges (the Depth axis, here).">
+            Depth buffer (in)
+            <input type="number" id="depth-buffer-override" min="0" step="1" />
+          </label>
+          <div class="mode-options">
+            <label><input type="radio" name="mode" value="compact" checked /> Compact</label>
+            <label><input type="radio" name="mode" value="spread" /> Spread</label>
+          </div>
+          <label id="packing-field">
+            Packing (round tables only)
+            <select id="packing">
+              <option value="auto">Auto (best fit)</option>
+              <option value="square">Square</option>
+              <option value="hex">Hex</option>
+            </select>
+          </label>
+          <div class="form-row">
+            <label title="Shifts where the auto-placement grid starts, so a partial row against an obstacle can be skipped in favor of starting fresh where a full row fits.">
+              Start X (ft)
+              <input type="number" id="start-x" min="0" step="0.5" value="0" />
+            </label>
+            <label title="Shifts where the auto-placement grid starts, so a partial row against an obstacle can be skipped in favor of starting fresh where a full row fits.">
+              Start Y (ft)
+              <input type="number" id="start-y" min="0" step="0.5" value="0" />
+            </label>
+          </div>
+        </fieldset>
+        </div>
+
+        <fieldset>
+          <legend>Obstacles</legend>
+          <div class="obstacle-table-wrap">
+            <table class="obstacle-table">
+              <thead>
+                <tr>
+                  <th>X (ft)</th>
+                  <th>Y (ft)</th>
+                  <th>Width (ft)</th>
+                  <th>Depth (ft)</th>
+                  <th>Shape</th>
+                  <th>Buffer (in)</th>
+                  <th>Seats</th>
+                  <th>Label</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="obstacle-rows"></tbody>
+            </table>
+          </div>
+          <button type="button" id="add-obstacle">+ Add obstacle</button>
+        </fieldset>
+      </form>
+
+      <fieldset>
+        <legend>Configuration (JSON)</legend>
+        <label>
+          Starting point
+          <select id="preset-select"></select>
+        </label>
+        <div class="config-actions">
+          <button type="button" id="load-preset">Load starting point</button>
+          <span id="preset-status" class="config-status"></span>
+        </div>
+        <p class="hint">Live view of the current setup. Paste a previous config here and click Load to continue it.</p>
+        <textarea id="config-json" rows="14" spellcheck="false"></textarea>
+        <div class="config-actions">
+          <button type="button" id="load-config">Load configuration</button>
+          <span id="config-status" class="config-status"></span>
+        </div>
+        <div class="config-actions">
+          <button type="button" id="share-link">Copy share link</button>
+          <span id="share-status" class="config-status"></span>
+        </div>
+        <input type="text" id="share-url" readonly hidden />
+      </fieldset>
+    </div>
+
+    <div class="preview-column">
+      <div id="summary"></div>
+      <p class="hint">Drag on the diagram to add an obstacle (pillar, stage, bar, door...); fine-tune or remove it in the Obstacles list above. Click a table to pin it in place &mdash; the rest reflow around it, and removing it from the Obstacles list frees that seat count back up for auto-placement.</p>
+      <div id="diagram"></div>
+    </div>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
