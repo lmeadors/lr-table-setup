@@ -37,12 +37,17 @@ const startYInput = document.getElementById('start-y');
 const shareLinkBtn = document.getElementById('share-link');
 const shareStatusEl = document.getElementById('share-status');
 const shareUrlEl = document.getElementById('share-url');
+const walkthroughBtn = document.getElementById('walkthrough-btn');
+const walkthroughOverlay = document.getElementById('walkthrough-overlay');
+const walkthroughCanvasHost = document.getElementById('walkthrough-canvas-host');
+const walkthroughExitBtn = document.getElementById('walkthrough-exit');
 
 let obstacles = [];
 let nextObstacleId = 1;
 let dragState = null;
 let lastStrategy = null;
 let lastResult = null;
+let walkthroughHandle = null;
 
 function populateTableCatalog() {
   tableSelect.innerHTML = tableCatalog
@@ -157,6 +162,7 @@ function update() {
   packingField.hidden = !tableType || tableType.shape !== 'round';
   depthBufferField.hidden = !tableType || tableType.shape === 'round';
   bufferLabel.childNodes[0].textContent = depthBufferField.hidden ? 'Buffer (in) ' : 'Width buffer (in) ';
+  walkthroughBtn.disabled = !room.width || !room.depth || !tableType;
 
   if (!tableType || !guestCount || !room.width || !room.depth) {
     summaryEl.innerHTML = '';
@@ -651,6 +657,26 @@ tableSelect.addEventListener('change', () => {
 });
 
 form.addEventListener('input', update);
+
+function closeWalkthrough() {
+  walkthroughHandle?.dispose();
+  walkthroughHandle = null;
+  walkthroughOverlay.hidden = true;
+}
+
+walkthroughBtn.addEventListener('click', async () => {
+  walkthroughOverlay.hidden = false;
+  const { openWalkthrough } = await import('./lib/scene3d.js');
+  walkthroughHandle = openWalkthrough(walkthroughCanvasHost, readRoom(), readArrangeInputs().tableType, lastResult);
+});
+
+walkthroughExitBtn.addEventListener('click', closeWalkthrough);
+
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && !walkthroughOverlay.hidden) {
+    closeWalkthrough();
+  }
+});
 
 async function loadDefaults() {
   try {
