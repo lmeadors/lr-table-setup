@@ -234,36 +234,61 @@ function setShareStatus(message, kind) {
 }
 
 // The URL hash (never sent to the server, unlike the query string) carries
-// the whole config as compact JSON, URL-safe-base64-encoded - no backend
-// needed to "host" a shared link. Standard base64's +/ chars are avoided so
-// the link survives being pasted into places that treat + as a space or "/"
-// as a path separator (some chat apps, older link-preview bots).
-function encodeConfigForUrl(config) {
-  const json = JSON.stringify(config);
-  const bytes = new TextEncoder().encode(json);
+// the whole config - no backend needed to "host" a shared link. gzipped via
+// the browser's native CompressionStream (no dependency; Chrome/Firefox/
+// Safari have all shipped it since 2023) before base64-encoding, since the
+// raw JSON alone produced links long enough that iMessage's link-detection
+// mangled them - gzip cuts a typical multi-obstacle room's link by ~70%.
+// Standard base64's +/ chars are swapped for URL-safe -/_ so the link
+// survives being pasted into places that treat + as a space or "/" as a
+// path separator. #z= is the gzipped format; #c= (uncompressed) is kept as
+// a decode-only fallback for a browser without CompressionStream and for
+// any links already shared under the old format.
+function bytesToUrlSafeBase64(bytes) {
   let binary = '';
   for (const byte of bytes) binary += String.fromCharCode(byte);
   return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
-function decodeConfigFromUrl(encoded) {
+function urlSafeBase64ToBytes(encoded) {
   const base64 = encoded.replace(/-/g, '+').replace(/_/g, '/');
   const padded = base64 + '='.repeat((4 - (base64.length % 4)) % 4);
   const binary = atob(padded);
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-  return JSON.parse(new TextDecoder().decode(bytes));
+  return bytes;
+}
+
+async function gzipText(text) {
+  const stream = new Blob([text]).stream().pipeThrough(new CompressionStream('gzip'));
+  return new Uint8Array(await new Response(stream).arrayBuffer());
+}
+
+async function gunzipBytes(bytes) {
+  const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
+  return new TextDecoder().decode(await new Response(stream).arrayBuffer());
+}
+
+async function buildShareUrl(config) {
+  const json = JSON.stringify(config);
+  const base = `${location.origin}${location.pathname}`;
+  if (typeof CompressionStream === 'undefined') {
+    return `${base}#c=${bytesToUrlSafeBase64(new TextEncoder().encode(json))}`;
+  }
+  return `${base}#z=${bytesToUrlSafeBase64(await gzipText(json))}`;
 }
 
 // Returns true if a shared config was found (valid or not) - the caller uses
 // that to decide whether to still fall back to defaults.json.
-function loadFromShareLink() {
+async function loadFromShareLink() {
   const hash = window.location.hash;
-  if (!hash.startsWith('#c=')) return false;
+  const isGzipped = hash.startsWith('#z=');
+  if (!isGzipped && !hash.startsWith('#c=')) return false;
 
   try {
-    const config = decodeConfigFromUrl(hash.slice(3));
-    const result = applyConfig(config);
+    const bytes = urlSafeBase64ToBytes(hash.slice(3));
+    const json = isGzipped ? await gunzipBytes(bytes) : new TextDecoder().decode(bytes);
+    const result = applyConfig(JSON.parse(json));
     if (!result.ok) {
       console.warn('Shared link config is invalid, falling back to defaults:', result.error);
       return false;
@@ -277,8 +302,7 @@ function loadFromShareLink() {
 }
 
 shareLinkBtn.addEventListener('click', async () => {
-  const encoded = encodeConfigForUrl(currentConfig());
-  const url = `${location.origin}${location.pathname}#c=${encoded}`;
+  const url = await buildShareUrl(currentConfig());
   history.replaceState(null, '', url);
 
   shareUrlEl.value = url;
@@ -644,6 +668,6 @@ async function loadDefaults() {
 
 populateTableCatalog();
 resetBufferToDefault();
-const loadedFromShareLink = loadFromShareLink();
+const loadedFromShareLink = await loadFromShareLink();
 await Promise.all([loadedFromShareLink ? Promise.resolve() : loadDefaults(), loadPresetManifest()]);
 update();
