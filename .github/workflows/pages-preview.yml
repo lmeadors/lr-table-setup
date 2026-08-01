@@ -30,7 +30,7 @@ jobs:
           if git -C source show-ref --verify --quiet refs/remotes/origin/gh-pages; then
             git -C source worktree add ../gh-pages-wt gh-pages
           else
-            git -C source worktree add --orphan ../gh-pages-wt gh-pages
+            git -C source worktree add --orphan -b gh-pages ../gh-pages-wt
           fi
 
       - name: Sync main's content into gh-pages root (preserve pr-*/ subfolders)
@@ -67,7 +67,7 @@ jobs:
           if git -C source show-ref --verify --quiet refs/remotes/origin/gh-pages; then
             git -C source worktree add ../gh-pages-wt gh-pages
           else
-            git -C source worktree add --orphan ../gh-pages-wt gh-pages
+            git -C source worktree add --orphan -b gh-pages ../gh-pages-wt
           fi
 
       - name: Copy this PR's content into its subfolder
