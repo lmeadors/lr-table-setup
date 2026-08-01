@@ -87,6 +87,7 @@ jobs:
           git push origin gh-pages
 
       - name: Comment preview link on PR
+        working-directory: source
         run: |
           MARKER="<!-- pr-preview-link -->"
           BODY="${MARKER}
