@@ -13,7 +13,7 @@ export const CHAIR_SEAT_FT = 1.5;
 export const CHAIR_SEAT_HEIGHT_FT = 1.5;
 export const CHAIR_BACK_HEIGHT_FT = 1.5;
 export const EYE_HEIGHT_FT = 5.5;
-export const PLAYER_RADIUS_FT = 1.0;
+export const PLAYER_RADIUS_FT = 0.75; // ~18in shoulder width
 export const MOVE_SPEED_FT_PER_SEC = 8;
 
 // Places seats around a round table or along the two long edges of a rect
@@ -47,15 +47,7 @@ export function computeChairTransforms(input) {
     return chairs;
   }
 
-  // Rect: whichever physical dimension is longer is the seating-edge axis
-  // (chairs spread along it); the shorter one is the pushback axis, and its
-  // paired clearance key is the chair clearance. Not hardcoded to `width` -
-  // catalog.js's *-rotated table types swap which physical dimension is
-  // which, and the clearanceBuffer keys swap right along with them.
-  const longIsWidth = input.widthFt >= input.depthFt;
-  const longFt = longIsWidth ? input.widthFt : input.depthFt;
-  const shortFt = longIsWidth ? input.depthFt : input.widthFt;
-  const shortClearanceFt = longIsWidth ? input.clearanceDepthFt : input.clearanceWidthFt;
+  const { longIsWidth, longFt, shortFt, shortClearanceFt } = rectSeatingAxis(input);
   const offset = shortFt / 2 + shortClearanceFt / 2;
 
   const front = Math.floor(input.seats / 2);
@@ -64,6 +56,21 @@ export function computeChairTransforms(input) {
     ...edgeChairs(front, longFt, offset, longIsWidth, 1),
     ...edgeChairs(back, longFt, offset, longIsWidth, -1),
   ];
+}
+
+// Rect: whichever physical dimension is longer is the seating-edge axis
+// (chairs spread along it); the shorter one is the pushback axis, and its
+// paired clearance key is the chair clearance. Not hardcoded to `width` -
+// catalog.js's *-rotated table types swap which physical dimension is
+// which, and the clearanceBuffer keys swap right along with them.
+function rectSeatingAxis(input) {
+  const longIsWidth = input.widthFt >= input.depthFt;
+  return {
+    longIsWidth,
+    longFt: longIsWidth ? input.widthFt : input.depthFt,
+    shortFt: longIsWidth ? input.depthFt : input.widthFt,
+    shortClearanceFt: longIsWidth ? input.clearanceDepthFt : input.clearanceWidthFt,
+  };
 }
 
 function edgeChairs(count, longFt, offset, longIsWidth, side) {
@@ -80,16 +87,105 @@ function edgeChairs(count, longFt, offset, longIsWidth, side) {
   return chairs;
 }
 
-// Room boundary, every obstacle (expanded by its own buffer, same convention
-// as lib/geometry.js's obstacleBoundsIn), and every auto-placed table (using
-// result.footprint - the solver's own buffer-inflated size - as its
-// collider, so chair-occupied space is covered without modeling individual
-// chairs). Pinned tables need no special handling: they're already covered
-// by the general obstacle loop above. All returned bodies are in feet.
+// tableType.dimensions/clearanceBuffer are inches; result.footprint is the
+// solver's own buffer-inflated size (also inches), reflecting spread mode's
+// maximized spacing rather than the raw catalog clearanceBuffer. Converts
+// both to the feet-based shape computeChairTransforms/occupiedFootprint
+// expect.
+export function chairInputForTableType(tableType, footprint) {
+  if (tableType.shape === 'round') {
+    const diameterFt = tableType.dimensions.diameter / 12;
+    const clearanceFt = (footprint.width / 12 - diameterFt) / 2;
+    return { shape: 'round', diameterFt, clearanceFt, seats: tableType.seats };
+  }
+  const widthFt = tableType.dimensions.width / 12;
+  const depthFt = tableType.dimensions.depth / 12;
+  return {
+    shape: 'rect',
+    widthFt,
+    depthFt,
+    clearanceWidthFt: (footprint.width / 12 - widthFt) / 2,
+    clearanceDepthFt: (footprint.depth / 12 - depthFt) / 2,
+    seats: tableType.seats,
+  };
+}
+
+// Pinned-table obstacles (an obstacle with seats > 0 - see render.js's
+// obstacle-pinned-table case) aren't tableType objects: they only carry one
+// scalar buffer applied to both axes (same over-buffering tradeoff app.js's
+// own pin-to-obstacle click handler already accepts) and their own `seats`,
+// independent of any catalog entry's seat count (e.g. a 4-seat head-table
+// segment built from an 8ft table body that normally seats 8).
+export function chairInputForPinnedObstacle(obstacle) {
+  const clearanceFt = (obstacle.buffer || 0) / 12;
+  if (obstacle.shape === 'round') {
+    return { shape: 'round', diameterFt: obstacle.width, clearanceFt, seats: obstacle.seats };
+  }
+  return {
+    shape: 'rect',
+    widthFt: obstacle.width,
+    depthFt: obstacle.depth,
+    clearanceWidthFt: clearanceFt,
+    clearanceDepthFt: clearanceFt,
+    seats: obstacle.seats,
+  };
+}
+
+// The buffer-inflated footprint (result.footprint, or an obstacle's own
+// buffer) is the solver's per-table reservation for that table's own chair
+// pushback space - it isn't a shared walking aisle, and packing maximizes
+// density by placing adjacent footprints exactly tangent to each other (see
+// findSpawnPoint's comment). Colliding against the full footprint everywhere
+// means the walkthrough can have literally zero gap between neighboring
+// tables. This computes a tighter collider from the real table+chair
+// geometry instead - the chair's own transform plus half a chair depth for
+// the seat/backrest - so the walkthrough only blocks the floor space chairs
+// actually occupy, leaving whatever real gap exists (if any) walkable.
+export function occupiedFootprint(chairInput) {
+  if (!chairInput.seats || chairInput.seats <= 0) {
+    return chairInput.shape === 'round'
+      ? { shape: 'round', radiusFt: chairInput.diameterFt / 2 }
+      : { shape: 'rect', halfWidthFt: chairInput.widthFt / 2, halfDepthFt: chairInput.depthFt / 2 };
+  }
+  if (chairInput.shape === 'round') {
+    const chairDist = chairInput.diameterFt / 2 + chairInput.clearanceFt / 2;
+    return { shape: 'round', radiusFt: chairDist + CHAIR_SEAT_FT / 2 };
+  }
+  const { longIsWidth, longFt, shortFt, shortClearanceFt } = rectSeatingAxis(chairInput);
+  const halfLong = longFt / 2;
+  const pushbackOffset = shortFt / 2 + shortClearanceFt / 2 + CHAIR_SEAT_FT / 2;
+  return longIsWidth
+    ? { shape: 'rect', halfWidthFt: halfLong, halfDepthFt: pushbackOffset }
+    : { shape: 'rect', halfWidthFt: pushbackOffset, halfDepthFt: halfLong };
+}
+
+function occupiedBody(occupied, cx, cz) {
+  if (occupied.shape === 'round') {
+    return { type: 'circle', cx, cz, radius: occupied.radiusFt };
+  }
+  return {
+    type: 'rect',
+    x0: cx - occupied.halfWidthFt,
+    x1: cx + occupied.halfWidthFt,
+    z0: cz - occupied.halfDepthFt,
+    z1: cz + occupied.halfDepthFt,
+  };
+}
+
+// Room boundary, every non-table obstacle (expanded by its own buffer, same
+// convention as lib/geometry.js's obstacleBoundsIn - these are actually
+// solid the whole buffer out, e.g. a bar or DJ booth), and every table -
+// pinned or auto-placed - using its real chair-occupied footprint rather
+// than the buffer-inflated one. All returned bodies are in feet.
 export function computeCollisionBodies(room, tableType, result) {
   const bodies = [{ type: 'room', width: room.width, depth: room.depth }];
 
   for (const o of room.obstacles || []) {
+    if (o.seats > 0) {
+      const occupied = occupiedFootprint(chairInputForPinnedObstacle(o));
+      bodies.push(occupiedBody(occupied, o.x + o.width / 2, o.y + o.depth / 2));
+      continue;
+    }
     const bufferFt = (o.buffer || 0) / 12;
     if (o.shape === 'round') {
       bodies.push({
@@ -110,22 +206,9 @@ export function computeCollisionBodies(room, tableType, result) {
   }
 
   if (result && tableType) {
-    const footprintWidthFt = result.footprint.width / 12;
-    const footprintDepthFt = result.footprint.depth / 12;
+    const occupied = occupiedFootprint(chairInputForTableType(tableType, result.footprint));
     for (const t of result.tables) {
-      const cx = t.x / 12;
-      const cz = t.y / 12;
-      if (tableType.shape === 'round') {
-        bodies.push({ type: 'circle', cx, cz, radius: footprintWidthFt / 2 });
-      } else {
-        bodies.push({
-          type: 'rect',
-          x0: cx - footprintWidthFt / 2,
-          x1: cx + footprintWidthFt / 2,
-          z0: cz - footprintDepthFt / 2,
-          z1: cz + footprintDepthFt / 2,
-        });
-      }
+      bodies.push(occupiedBody(occupied, t.x / 12, t.y / 12));
     }
   }
 
