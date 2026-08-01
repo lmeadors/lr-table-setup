@@ -1,0 +1,12 @@
+[
+  {
+    "id": "wedding-152",
+    "label": "Legacy Ranch — Wedding (152 guests)",
+    "file": "defaults.json"
+  },
+  {
+    "id": "wedding-200-head-table",
+    "label": "Legacy Ranch — Wedding w/ Head Table (200 guests)",
+    "file": "presets/wedding-200-head-table.json"
+  }
+]
