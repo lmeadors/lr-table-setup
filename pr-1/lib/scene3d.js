@@ -13,6 +13,7 @@ import {
   MOVE_SPEED_FT_PER_SEC,
   computeChairTransforms,
   computeCollisionBodies,
+  findSpawnPoint,
   resolveMove,
 } from './scene3d-geometry.js';
 
@@ -200,8 +201,11 @@ export function openWalkthrough(container, room, tableType, result) {
   buildObstacles(scene, room, mats);
   buildAutoTables(scene, tableType, result, mats);
 
+  const colliders = computeCollisionBodies(room, tableType, result);
+  const spawn = findSpawnPoint(room, colliders, PLAYER_RADIUS_FT);
+
   const camera = new THREE.PerspectiveCamera(70, container.clientWidth / container.clientHeight, 0.1, 500);
-  camera.position.set(room.width / 2, EYE_HEIGHT_FT, room.depth / 2);
+  camera.position.set(spawn.x, EYE_HEIGHT_FT, spawn.z);
 
   const renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setSize(container.clientWidth, container.clientHeight);
@@ -234,7 +238,6 @@ export function openWalkthrough(container, room, tableType, result) {
   window.addEventListener('keydown', onKeyDown);
   window.addEventListener('keyup', onKeyUp);
 
-  const colliders = computeCollisionBodies(room, tableType, result);
   const timer = new THREE.Timer();
   timer.connect(document);
 

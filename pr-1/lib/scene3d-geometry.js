@@ -152,6 +152,30 @@ function collides(pos, colliders, r) {
   return colliders.some((body) => bodyCollides(pos, r, body));
 }
 
+// Room center is the natural spawn point, but a packed/near-capacity layout
+// can leave a table sitting right on it - spiral outward on rings of
+// growing radius until an unobstructed point turns up. Starting inside a
+// collider isn't just a bad spawn: resolveMove's full/X-only/Z-only probes
+// can all still land inside the same body, which reads as "WASD does
+// nothing" rather than "I'm stuck".
+export function findSpawnPoint(room, colliders, playerRadiusFt) {
+  const cx = room.width / 2;
+  const cz = room.depth / 2;
+  if (!collides({ x: cx, z: cz }, colliders, playerRadiusFt)) return { x: cx, z: cz };
+
+  const step = playerRadiusFt;
+  const maxRadius = Math.hypot(room.width, room.depth) / 2 + step;
+  for (let radius = step; radius <= maxRadius; radius += step) {
+    const samples = Math.max(8, Math.round((2 * Math.PI * radius) / step));
+    for (let i = 0; i < samples; i++) {
+      const angle = (2 * Math.PI * i) / samples;
+      const pos = { x: cx + radius * Math.cos(angle), z: cz + radius * Math.sin(angle) };
+      if (!collides(pos, colliders, playerRadiusFt)) return pos;
+    }
+  }
+  return { x: cx, z: cz };
+}
+
 function bodyCollides(pos, r, body) {
   if (body.type === 'room') {
     return pos.x - r < 0 || pos.x + r > body.width || pos.z - r < 0 || pos.z + r > body.depth;
