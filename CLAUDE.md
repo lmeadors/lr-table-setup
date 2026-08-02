@@ -6,7 +6,7 @@ Live: https://lmeadors.github.io/lr-table-setup/ (GitHub Pages, deploys on push 
 
 ## Stack and constraints
 
-- Vanilla JS ES modules, no build step, no dependencies. Serve locally with `python3 -m http.server 8080` (can't be opened as a bare `file://` page — ES modules need a server).
+- Vanilla JS ES modules, no build step, no dependencies — except Three.js, loaded via a CDN import map for the 3D Walkthrough only (see `lib/scene3d.js`); nothing else in the app depends on it, and it's not fetched unless that feature is opened.
 - Keep it that way — no bundler, no framework, no TypeScript — unless explicitly asked to change it.
 - Built to be white-labelable eventually (see PLAN.md), so avoid hardcoding Legacy-Ranch-specific assumptions into the core solver/render code; venue-specific stuff belongs in `defaults.json`/`presets/`, not `lib/`.
 
@@ -17,6 +17,8 @@ Live: https://lmeadors.github.io/lr-table-setup/ (GitHub Pages, deploys on push 
 - `lib/geometry.js` — footprint/collision math (square + hex grid candidate generation, obstacle overlap tests). Obstacle `width`/`depth` is always real physical size; `buffer` (inches) is applied at collision-check time, never baked into stored dimensions.
 - `lib/solver.js` — `arrange()`: compact vs. spread packing, auto/square/hex strategy choice, buffer maximization in spread mode.
 - `lib/render.js` — SVG diagram rendering (room, obstacles, tables, halos).
+- `lib/scene3d-geometry.js` — pure math for the 3D walkthrough (chair placement, collision bodies), feet-based, no Three.js/DOM import; mirrors the `lib/geometry.js` split.
+- `lib/scene3d.js` — Three.js first-person walkthrough renderer/controller, dynamically imported only when the 3D Walkthrough button is clicked.
 - `defaults.json` — the config the form loads with on page load; same shape as the Configuration (JSON) box.
 - `presets/manifest.json` — selectable starting-point configs (the "Starting point" dropdown); entries are `{ id, label, file }`, `file` fetched relative to site root.
 - `themes.js` / `theme-gallery.html` — CSS custom property theming for embedding elsewhere; see STYLING.md.
